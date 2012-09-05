@@ -1,0 +1,16 @@
+####---------------------------------------------------------------
+#### HYDRA -> SGI Origin 2000
+####---------------------------------------------------------------
+CC = CC
+###
+####----NO MPI
+#CFLAGS  = -D NO_MPI -64 -O3 -D FAST  -I.  -Wno-deprecated
+CFLAGS  = -D DEBUG -64 -O3 -D NO_MPI -I. -LANG:std -OPT:Olimit=0 -C
+CLD = -LANG:std -64
+#CLIBS = -lmpi -lmpi++
+###
+####----MPI
+#CFLAGS  = -64 -O0 -D FAST  -I.  -LANG:std -OPT:Olimit=0 -C
+#CLD = -LANG:std -64 -lmpi -lmpi++
+#CLIBS = -lmpi -lmpi++
+

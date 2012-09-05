@@ -1,0 +1,73 @@
+# Include files <file.h> and <file.o> dependencies for tools files
+
+CreateChemtable4d_DEP = $(MUM_HOME)/src/common/Param.o \
+                        $(MUM_HOME)/src/common/MpiStuff.o \
+                        $(MUM_HOME)/src/common/MiscUtils.o \
+                        $(MUM_HOME)/src/common/mpi_tommie.o
+                     
+TestCombustion_DEP = $(MUM_HOME)/src/common/Param.o \
+                     $(MUM_HOME)/src/common/MpiStuff.o \
+                     $(MUM_HOME)/src/common/MiscUtils.o \
+                     $(MUM_HOME)/src/common/mpi_tommie.o \
+                     $(MUM_HOME)/src/common/mixing_combustion/CombustionGeneralDefinitions.o 
+                     
+TestFlamelet_DEP = $(MUM_HOME)/src/common/Param.o \
+                   $(MUM_HOME)/src/common/MpiStuff.o \
+                   $(MUM_HOME)/src/common/MiscUtils.o \
+                   $(MUM_HOME)/src/common/mpi_tommie.o
+                     
+CreateChemTable_DEP = $(MUM_HOME)/src/common/Param.o \
+                      $(MUM_HOME)/src/common/MpiStuff.o \
+                      $(MUM_HOME)/src/common/MiscUtils.o \
+                      $(MUM_HOME)/src/common/mpi_tommie.o \
+                      $(MUM_HOME)/src/common/mixing_combustion/CombustionGeneralDefinitions.o
+
+CreateChemTable_new_DEP = $(MUM_HOME)/src/common/Param.o \
+                          $(MUM_HOME)/src/common/MpiStuff.o \
+                          $(MUM_HOME)/src/common/MiscUtils.o \
+                          $(MUM_HOME)/src/common/mpi_tommie.o \
+                          $(MUM_HOME)/src/common/mixing_combustion/CombustionGeneralDefinitions.o\
+                          $(MUM_HOME)/src/common/mixing_combustion/pdf_functions.o\
+                          $(MUM_HOME)/src/common/mixing_combustion/Table3D.o\
+                          $(MUM_HOME)/src/common/mixing_combustion/ChemtableNormalized.o
+                     
+mum_hold_DEP = $(MUM_HOME)/src/common/MpiStuff.o \
+               $(MUM_HOME)/src/common/mpi_tommie.o
+               
+ThermoProperties_DEP = $(MUM_HOME)/src/common/Param.o \
+                       $(MUM_HOME)/src/common/MpiStuff.o \
+                       $(MUM_HOME)/src/common/MiscUtils.o \
+                       $(MUM_HOME)/src/common/mpi_tommie.o
+
+CreatePressureChemTable_DEP = $(MUM_HOME)/src/common/Param.o \
+                          $(MUM_HOME)/src/common/MpiStuff.o \
+                          $(MUM_HOME)/src/common/MiscUtils.o \
+                          $(MUM_HOME)/src/common/mpi_tommie.o \
+                          $(MUM_HOME)/src/common/mixing_combustion/CombustionGeneralDefinitions.o\
+                          $(MUM_HOME)/src/common/mixing_combustion/Numerical_Recipes/ludcmp.o \
+                          $(MUM_HOME)/src/common/mixing_combustion/Numerical_Recipes/qrdcmp.o \
+                          $(MUM_HOME)/src/common/mixing_combustion/Table3D.o\
+                          $(MUM_HOME)/src/common/mixing_combustion/ChemtableNormalized.o \
+                          $(MUM_HOME)/src/common/mixing_combustion/Table4D.o \
+                          $(MUM_HOME)/src/common/mixing_combustion/PressureTable.o
+                          #$(MUM_HOME)/src/common/mixing_combustion/ChemtableCartesianLinear_single.o \
+
+TestPressureTable_DEP = $(MUM_HOME)/src/common/Param.o \
+                        $(MUM_HOME)/src/common/MpiStuff.o \
+                        $(MUM_HOME)/src/common/MiscUtils.o \
+                        $(MUM_HOME)/src/common/mpi_tommie.o \
+                        $(MUM_HOME)/src/common/mixing_combustion/CombustionGeneralDefinitions.o\
+                        $(MUM_HOME)/src/common/mixing_combustion/Numerical_Recipes/ludcmp.o \
+                        $(MUM_HOME)/src/common/mixing_combustion/Numerical_Recipes/qrdcmp.o \
+                        $(MUM_HOME)/src/common/mixing_combustion/ChemtableCartesianLinear_single.o \
+                        $(MUM_HOME)/src/common/mixing_combustion/Table4D.o \
+                        $(MUM_HOME)/src/common/mixing_combustion/PressureTable.o
+
+
+ChemLinToTecplot_DEP = $(MUM_HOME)/src/common/Param.o \
+                       $(MUM_HOME)/src/common/MpiStuff.o \
+                       $(MUM_HOME)/src/common/MiscUtils.o \
+                       $(MUM_HOME)/src/common/mpi_tommie.o \
+                       $(MUM_HOME)/src/common/mixing_combustion/CombustionGeneralDefinitions.o\
+                       $(MUM_HOME)/src/common/mixing_combustion/Table3D.o\
+                       $(MUM_HOME)/src/common/mixing_combustion/ChemtableNormalized.o

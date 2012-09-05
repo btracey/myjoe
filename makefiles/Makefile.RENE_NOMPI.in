@@ -1,0 +1,10 @@
+
+
+CC      = icpc
+
+
+CFLAGS  = -O3 -D NO_MPI -D NO_ASSERT -I. -D DEBUG  #-D MPI_OFFSET_IS_LONG_LONG_INT
+
+
+
+

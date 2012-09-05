@@ -1,0 +1,95 @@
+##############################
+# Debugging Level:
+# ----------------------------
+
+#LOGGING_LEVEL = DEBUG_HI            # show all linear solver residuals
+#LOGGING_LEVEL = INFO_LO             # show part of the linear solver residuals
+LOGGING_LEVEL = INFO_HI                 # show standard output 
+
+################################
+#     GAS PROPERTIES
+#------------------------------
+RHO_REF = 1.0
+P_REF = 10535.4934           # To make M_bulk=0.2 (P = 1/gamma * (Umax/M)^2)
+T_REF = 1.0
+U_INITIAL = 1.0 0.0 0.0 
+MU_MODE = POWERLAW
+MU_POWER_LAW = 0.0
+MU_REF = 4.99251123e-4       # MU_REF = 1/RE_TAU
+
+SET_INIT_PROFILE
+################################
+#     RESTART FILE
+#-------------------------------
+RESTART = ./restart.init
+#RESTART = ./restart.in
+
+################################
+#      SOLVER SETTINGS
+#-------------------------------
+
+CFL = 1.0                             
+CFL_RAMP AFTER_ITER=100  INTERVAL_ITER=100  FACTOR_CFL=1.2  MAX_CFL=100.0 
+
+NSTEPS = 15000                        # number of time iterations 
+CHECK_INTERVAL = 10                    # interval print residuals
+WRITE_RESTART = 15000                  # write restart interval
+
+TIME_INTEGRATION = BACKWARD_EULER
+
+#LINEAR_SOLVER_NS = BCGSTAB
+LINEAR_SOLVER_NS = PETSC_GMRES
+
+LINEAR_SOLVER_NS_TRESHOLDS  MAX_ITER=30  ABS_RESID=1.0e-10  REL_RESID=1.0e-5
+UNDER_RELAXATION = 1.0
+
+#LINEAR_SOLVER_SCALARS = BCGSTAB
+LINEAR_SOLVER_SCALARS = PETSC_GMRES
+
+SPATIAL_SECOND_ORDER    # if line is commented then first order in space for inviscid fluxes
+GRAD_RECONSTRUCTION  SCHEME=GREENGAUSS  LIMITER=YES  EPS=0.01
+
+SPACE_INTEGRATION = HLLC
+
+#SCALAR_RECONSTRUCTION = STANDARD
+SCALAR_RECONSTRUCTION = CONSERVATIVE
+
+#################################
+#     BOUNDARY CONDITIONS
+# -------------------------------
+
+top = SYMMETRY
+bottom = WALL TEMP = 1.0
+#inlet-periodic
+#outlet-periodic
+span1 = SYMMETRY
+span2 = SYMMETRY
+
+INITIAL_CONDITION_TURB 0.85080 170.42
+
+bottom.kine = 0.0
+bottom.omega = HOOK
+
+##############################
+# ASBM
+# ----------------------------
+START_ASBM = 200
+BLOCK_FRQ = 10
+
+LINEAR_SOLVER_BLOCK_TRESHOLDS  MAX_ITER=500000  ABS_RESID=1.0e-10  REL_RESID=1.0e-10
+
+###############################
+# Limiters
+# -----------------------------
+
+SST_LIMIT_PK = 1
+SST_LIMITER_SHEARSTRESS = 1
+
+#################################
+#      OUTPUT SETTINGS 
+# -------------------------------
+
+CONVERGENCE_HISTORY = YES
+
+WRITE_DATA FORMAT=TECPLOT NAME=2DCHANNEL INTERVAL=5000 GEOM=ALL VARS= RHO vel press temp enthalpy gamma sos residField kine omega tscale lscale tscale_eddy tscale_max block_diag block_offdiag bphi
+

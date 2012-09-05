@@ -1,0 +1,34 @@
+#!/bin/bash
+
+#PBS -N JOE
+#PBS -o _JOE.out
+#PBS -j oe 
+#PBS -m aeb
+#PBS -M terrapon@stanford.edu
+#PBS -l nodes=72:ppn=24
+#PBS -l walltime=23:59:59
+
+JOE=/home/terrapon/runs/hyshot4d/joe
+HOLD_JOE=/home/terrapon/mum_code/bin/mum_hold
+PBS_O_WORKDIR=/home/terrapon/runs/hyshot4d
+
+RUN_TYPE=4
+NPROC=1728
+
+cd $PBS_O_WORKDIR
+cat $PBS_NODEFILE > nodes.txt
+
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $JOE $RUN_TYPE > log.$PBS_JOBID
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $HOLD_JOE >> log.$PBS_JOBID
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $JOE $RUN_TYPE >> log.$PBS_JOBID
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $HOLD_JOE >> log.$PBS_JOBID
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $JOE $RUN_TYPE >> log.$PBS_JOBID
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $HOLD_JOE >> log.$PBS_JOBID
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $JOE $RUN_TYPE >> log.$PBS_JOBID
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $HOLD_JOE >> log.$PBS_JOBID
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $JOE $RUN_TYPE >> log.$PBS_JOBID
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $HOLD_JOE >> log.$PBS_JOBID
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $JOE $RUN_TYPE >> log.$PBS_JOBID
+mpirun_rsh -np $NPROC -hostfile $PBS_NODEFILE $HOLD_JOE >> log.$PBS_JOBID
+
+echo "Finished!"

@@ -1,0 +1,53 @@
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/repos/MUM/!svn/ver/309/tutorials/joe/CompressionRampMa3
+END
+inletReTheta2800.txt
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/repos/MUM/!svn/ver/309/tutorials/joe/CompressionRampMa3/inletReTheta2800.txt
+END
+pressExp.dat
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/repos/MUM/!svn/ver/309/tutorials/joe/CompressionRampMa3/pressExp.dat
+END
+Joe.in
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/repos/MUM/!svn/ver/309/tutorials/joe/CompressionRampMa3/Joe.in
+END
+ramp.msh
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/repos/MUM/!svn/ver/309/tutorials/joe/CompressionRampMa3/ramp.msh
+END
+rampWall.dat
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/repos/MUM/!svn/ver/309/tutorials/joe/CompressionRampMa3/rampWall.dat
+END
+comparePress.lay
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/repos/MUM/!svn/ver/309/tutorials/joe/CompressionRampMa3/comparePress.lay
+END
+inletReTheta2000.txt
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/repos/MUM/!svn/ver/309/tutorials/joe/CompressionRampMa3/inletReTheta2000.txt
+END
+joe.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/repos/MUM/!svn/ver/309/tutorials/joe/CompressionRampMa3/joe.cpp
+END

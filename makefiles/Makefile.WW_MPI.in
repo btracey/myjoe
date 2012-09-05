@@ -1,0 +1,42 @@
+# --------------------------------------
+# --------------------------------------
+# --------------------------------------
+#
+# Tommie Makefile.WW_MPI.in
+# wavywall, with mpi and parmetis
+#
+#
+
+CC = /usr/local/mpich/bin/mpicxx
+CFLAGS = -O0 -g -I. -Wno-deprecated -I. -DNO_ASSERT -DWITH_PARMETIS -DWITH_HYPRE -DDEBUG $(PARMETIS_INC) $(HYPRE_INC) 
+#CFLAGS = -O3 -I. -Wno-deprecated -Wall -I. -DNO_ASSERT -DWITH_PARMETIS -DWITH_HYPRE $(PARMETIS_INC) $(HYPRE_INC) 
+#CFLAGS = -O3 -I. -Wno-deprecated -I. -DNO_ASSERT -DWITH_PARMETIS -DWITH_HYPRE -DWITH_FFTW -DDEBUG $(PARMETIS_INC) $(HYPRE_INC) $(FFT_INC)
+CLIBS = $(PARMETIS_LIB) $(HYPRE_LIB) $(METIS_LIB) $(FFT_LIB)
+
+# for openmp builds
+#CC = /usr/local/mpich/bin/mpicxx
+#CFLAGS = -O3 -I. -Wno-deprecated -I. -DNO_ASSERT -DWITH_PARMETIS -DWITH_HYPRE -fopenmp $(PARMETIS_INC) $(HYPRE_INC) 
+#CLIBS = -fopenmp -lgomp $(PARMETIS_LIB) $(HYPRE_LIB) $(METIS_LIB)
+
+# 
+# *_INC and *_LIB for the WITH_* defines used above
+#
+
+PARMETIS_INC = -I$(HOME)/codes/ParMetis-3.1
+PARMETIS_LIB = -L$(HOME)/codes/ParMetis-3.1 -lparmetis
+METIS_LIB = -lmetis
+
+HYPRE_INC = -I$(HOME)/hypre-2.2.0b/src/hypre/include
+HYPRE_LIB = -L$(HOME)/hypre-2.2.0b/src/hypre/lib -lHYPRE
+
+# these paths are already in the include and lib path: /usr/loca/lib and /usr/local/include
+FFT_INC = 
+FFT_LIB = -lfftw3
+
+LAPACK_LIB = /usr/lib64/liblapack.so.3
+
+# archiving tool...
+AR = ar -rv
+
+# archive indexing tool...
+RANLIB = ar -ts

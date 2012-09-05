@@ -1,0 +1,18 @@
+# --------------------------------------
+# --------------------------------------
+# --------------------------------------
+#
+# Makefile.JHF_INTEL_OPENMPI.in
+#
+
+PARMETIS_INC = -I/opt/parmetis-3.1/intel/openmpi/include
+PARMETIS_LIB = -L/opt/parmetis-3.1/intel/openmpi/lib -lparmetis
+METIS_LIB = -lmetis
+
+HYPRE_INC = -I/opt/hypre-2.0.0/intel/openmpi/include 
+HYPRE_LIB = -L/opt/hypre-2.0.0/intel/openmpi/lib -lHYPRE
+
+CC = /usr/mpi/intel/openmpi-1.2.5/bin/mpic++
+CFLAGS = -O -I. -Wno-deprecated -I. -DNO_ASSERT -DWITH_PARMETIS -DWITH_HYPRE $(PARMETIS_INC) $(HYPRE_INC) 
+CLIBS = $(PARMETIS_LIB) $(HYPRE_LIB) $(METIS_LIB)
+

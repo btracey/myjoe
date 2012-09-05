@@ -1,0 +1,22 @@
+
+#!/bin/bash
+
+### copy the mum's makefile into the current directory
+cp $MUM_HOME/makefiles/Makefile .
+
+### make joe
+make joe
+
+### run joe with Menter SST turbmodel (argument = 2)
+mpirun -np 8 ./joe 2 
+
+
+### post-processing
+gnuplot < scripts/gp_wallpressure
+tec360 -mesa -b scripts/png.mcr scripts/density.lay
+
+
+firefox wallpressure.png density.png &
+
+
+

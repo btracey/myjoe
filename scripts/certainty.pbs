@@ -1,0 +1,18 @@
+#!/bin/bash
+
+#PBS -N JOE
+#PBS -o _JOE.out
+#PBS -j oe 
+#PBS -m aeb
+#PBS -l nodes=1:ppn=24
+#PBS -l walltime=05:59:59
+
+JOE=/scratch/renep/hyshot2dcomb_finer/joe
+PBS_O_WORKDIR=/scratch/renep/hyshot2dcomb_finer
+
+# no need to change below this line.....
+
+cd $PBS_O_WORKDIR
+mpiexec $JOE 10 >& JOE.log
+
+echo "Finished!"

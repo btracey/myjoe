@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# check if 2 arguments present
+if [ ! $# -eq 2 ]; then
+   echo "There should be 2 arguments: directory name and run type"
+   exit 1
+fi
+
+dirname=$1
+runtype=$2
+
+# check if directory already exists
+if [ -d $dirname ]; then
+   echo "Directory $dirname already exists!"
+   exit 1
+fi
+
+mkdir $dirname
+cd $dirname
+cp ../error.dat_template ./error.dat
+
+for grid in restart.cart.0064x1x1.periodic.cdp restart.cart.0128x1x1.periodic.cdp restart.cart.0256x1x1.periodic.cdp restart.cart.0512x1x1.periodic.out restart.cart.1024x1x1.periodic.out restart.cart.2048x1x1.periodic.out
+do
+   # create run directory
+   rundir=grid_${grid:13:4}
+   mkdir $rundir
+   cd $rundir
+   mv ../error.dat .
+   cp ../../Joe.in_temp ./Joe.in
+   perl -pi -e "s{GRIDFILE_TEMPLATE}{../../grids/${grid}}" Joe.in
+   mpirun -np 4 ../../joe $runtype
+   mv error.dat ../
+   cd ../
+done
+
+echo " "
+echo "Directory $1 done!"
+echo " "

@@ -1,0 +1,22 @@
+
+# LLNL's hera
+
+MKL_LIB_DIR=/opt/intel/mkl/10.1.2.024/lib/em64t
+INTEL_LIB_DIR=/opt/intel/Compiler/11.1/064/lib/intel64
+
+PETSC_DIR = /share/apps/petsc-3.0.0-p4/intel-11-mvapich/
+PETSC_INC = -I${PETSC_DIR}/include 
+include ${PETSC_DIR}/conf/variables
+
+PARMETIS_INC = -I/share/apps/lib/parmetis/3.1.1/mvapich-1.2rc1-intel-11-dell-gen2/include
+PARMETIS_LIB = -L/share/apps/lib/parmetis/3.1.1/mvapich-1.2rc1-intel-11-dell-gen2/lib -lparmetis
+METIS_LIB = -lmetis
+
+CC = /share/apps/mvapich/intel-11-dell-gen2/bin/mpicxx 
+CFLAGS = -O3 -no-prec-div -DMPI_OFFSET_IS_LONG_LONG_INT -DWITH_PARMETIS -DNO_ASSERT -DWITH_PETSC -I. $(PARMETIS_INC) $(PETSC_INC)
+#CFLAGS = -O3 -DDEBUG -DMPI_OFFSET_IS_LONG_LONG_INT -DWITH_PARMETIS -DWITH_HYPRE -DNO_ASSERT -I. $(PARMETIS_INC)
+CLIBS = $(PARMETIS_LIB) $(MPI_LIBS) $(METIS_LIB) $(PETSC_LIB)
+
+#LAPACK_LIB = -llapack
+
+#-ipo, -static, -no-prec-div, and -xP

@@ -1,0 +1,15 @@
+#!/bin/bash
+# loop over all nodes saved in nodes.txt (from pbs script at submission: cat $PBS_NODEFILE > nodes.txt)
+# and perform command
+# Use: own_node_loop 'command'
+# Example: own_node_loop 'ps aux | grep terrapon'
+# Example: own_node_loop 'pkill joe'
+
+awk '!x[$0]++' nodes.txt > nodelist.txt
+
+for i in `cat nodelist.txt`
+do
+  echo " "
+  echo $i
+  ssh $i -x "$1"
+done

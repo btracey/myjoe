@@ -1,0 +1,31 @@
+####---------------------------------------------------------------
+#### VINCENT's linux workstation
+####---------------------------------------------------------------
+
+PETSC_DIR = /opt/petsc-3.0.0-p9
+PETSC_ARCH = linux-intel-opt
+include ${PETSC_DIR}/conf/variables
+
+PARMETIS_INC = -I/opt/ParMetis-3.1.1
+PARMETIS_LIB = -L/opt/ParMetis-3.1.1 -lparmetis
+METIS_LIB = -lmetis
+
+#MPI_INC = -I/opt/mpich2/include
+#MPI_LIB = -L/opt/mpich2/lib -lmpich++ 
+
+HYPRE_INC = -I/opt/hypre-2.4.0b/include
+HYPRE_LIB = -L/opt/hypre-2.4.0b/lib -lHYPRE
+
+CC = mpicxx
+F90 = mpif90
+
+CFLAGS = -DNO_ASSERT -DMPI_OFFSET_IS_LONG_LONG_INT -DWITH_PARMETIS -DWITH_HYPRE_VER_2_4 -DWITH_PETSC -O3 -xW -ip -I. $(PARMETIS_INC) $(MPI_INC) $(HYPRE_INC) $(LAPACK_LIB) $(PETSC_INCLUDE)
+ 
+ 
+CLD = -g  #-LANG:std -64
+CLIBS = $(PARMETIS_LIB) $(MPI_LIB) $(METIS_LIB) $(HYPRE_LIB) $(PETSC_LIB) 
+
+LAPACK_LIB = -llapack
+
+
+

@@ -1,0 +1,21 @@
+
+# LLNL's hera
+
+PETSC_DIR = /usr/local/tools/petsc-3.0.0
+PETSC_INC = -I${PETSC_DIR}/include 
+include ${PETSC_DIR}/conf/variables
+
+PARMETIS_INC = -I$(HOME)/ParMetis-3.1.linux
+PARMETIS_LIB = -L$(HOME)/ParMetis-3.1.linux/hera -lparmetis
+METIS_LIB = -lmetis
+
+
+CC = mpiicpc
+CFLAGS = -O3 -ipo -no-prec-div -DMPI_OFFSET_IS_LONG_LONG_INT -DWITH_PARMETIS -DNO_ASSERT -DWITH_PETSC \
+	-I. $(PARMETIS_INC) $(PETSC_INC)
+#CFLAGS = -O3 -DDEBUG -DMPI_OFFSET_IS_LONG_LONG_INT -DWITH_PARMETIS -DWITH_HYPRE -DNO_ASSERT -I. $(PARMETIS_INC)
+CLIBS = $(PARMETIS_LIB) $(MPI_LIBS) $(METIS_LIB) $(PETSC_LIB)
+
+LAPACK_LIB = -llapack
+
+#-ipo, -static, -no-prec-div, and -xP

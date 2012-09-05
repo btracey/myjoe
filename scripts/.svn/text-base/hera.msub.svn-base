@@ -1,0 +1,24 @@
+#!/bin/bash
+
+##### MSUB stuff
+#MSUB -l nodes=4:ppn=16
+#MSUB -l walltime=00:12:00:00 # dd:hh:mm:ss
+#MSUB -d /p/lscratcha/pecnik1/runs/HyshotUQ
+#MSUB -m be
+#MSUB -j oe
+
+#MSUB -l partition=hera
+
+#MSUB -A stanford
+
+##### DAT-specific options
+##MSUB -A stanfdat
+##MSUB -l qos=expedite
+
+##### run the job
+echo Job ID: $SLURM_JOBID
+echo Start time: `date`
+echo
+
+srun -n 64 ./joe Joe.in 10
+

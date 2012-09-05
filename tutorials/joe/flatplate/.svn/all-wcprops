@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/repos/MUM/!svn/ver/382/tutorials/joe/flatplate
+END
+Joe.in
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/repos/MUM/!svn/ver/382/tutorials/joe/flatplate/Joe.in
+END
+laminar_inlet.dat
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/repos/MUM/!svn/ver/309/tutorials/joe/flatplate/laminar_inlet.dat
+END
+plate.msh
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/repos/MUM/!svn/ver/382/tutorials/joe/flatplate/plate.msh
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/repos/MUM/!svn/ver/382/tutorials/joe/flatplate/Makefile
+END
+joe.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/repos/MUM/!svn/ver/382/tutorials/joe/flatplate/joe.cpp
+END

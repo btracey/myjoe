@@ -1,0 +1,35 @@
+#!/bin/bash 
+
+### compile Joe
+cp $MUM_HOME/makefiles/Makefile .
+make joe
+
+### Modify next line to give the correct path to your mpiexec or mpirun
+export pararun='mpirun'
+
+### run joe and plot individual solutions vs. exact solution
+### also export figures into latex format
+$pararun -np 2 ./joe Joe.in_HLLC 1 
+mv shocktube.dat shocktube_HLLC.dat
+export RUN_TYPE="HLLC"
+gnuplot gnu_comp_exact
+
+$pararun -np 2 ./joe Joe.in_AUSMDV_A 1 
+mv shocktube.dat shocktube_AUSMDV_A.dat
+export RUN_TYPE="AUSMDV_A"
+gnuplot gnu_comp_exact
+
+$pararun -np 2 ./joe Joe.in_AUSMDV_H 1 
+mv shocktube.dat shocktube_AUSMDV_H.dat
+export RUN_TYPE="AUSMDV_H"
+gnuplot gnu_comp_exact
+
+$pararun -np 2 ./joe Joe.in_HAENEL 1 
+mv shocktube.dat shocktube_HAENEL.dat
+export RUN_TYPE="HAENEL"
+gnuplot gnu_comp_exact
+
+rm restart.out
+
+### compare density solution between all schemes 
+gnuplot gnu_comp_space_integration

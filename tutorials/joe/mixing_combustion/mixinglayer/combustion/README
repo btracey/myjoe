@@ -1,0 +1,39 @@
+Supersonic mixing layer with combustion
+***************************************
+
+This simple test case simulates a 2D mixing layer between two different gases at supersonic speed. Unlike the mixing
+case, there is here combustion. The set up is the same as the mixing case.
+
+The test case can be run either with
+* FPVA:       the species mass fraction are used to compute the temperature (through a Newton iteration);
+* FPVA_coeff: the temperature is computed through a closed analytical formula based on an extrapolation of the
+              temperature around the flamelet solution (faster run time).
+
+To switch from one case to the other, comment out ' #define COEFF ' in "joe.cpp" (line 16). You can also choose between
+different chemistry table types (lines 24-30) but only 1 table is offered in the tutorial (due to space requirements). 
+
+The turbulence model used is k-omega SST but other Spalart-Allmaras or Wilcox k-omega can also be used by passing the 
+correct argument to the executable.
+
+NOTES:
+******
+
+* Due to the mixing rule used for the viscosity, no complete convergence can be achieved. You can comment out the pre-
+  compilation flag ' #define MIXING_VISCOSITY ' in RansCombFPVA.h or RansCombFPVA_Coeff.h, the viscosity will not be 
+  computed from mixing rules but through a standard Sutherland law; this will allow you to converge completely 
+  (the issue is due to the quality of the mesh).
+  
+* A fully coupled solver is used to converge (i.e., BACKWARD_EULER_COUPLED) where both the NSE and the scalars are 
+  solved coupled; this requires a smaller relative tolerance of the linear solver (i.e., 10^-6) due to the large values
+  of omega.
+  
+* A maximum CFL of 20 is prescribed; if CFL gets larger, the solution might diverge.
+
+* The value of the epsilon for the limiters is also critical; if the value is smaller than 10^2, the solution will not
+  completely converge.
+  
+* The flag ' REFERENCE_PRESSURE = 80000.0 ' in Joe.in is used to rescale the pressure of the chemistry table; the reason
+  is that at the case pressure (i.e., 0.4bar), the flame would start burning outside of the domain, thus, defying the
+  purpose of this tutorial; increasing the case pressure to ensure a faster ignition would increase the Reynolds number
+  and, thus, the size of the mesh; by artificially using a chemistry table at higher pressure and rescaling it a bit, the
+  flame is located within the domain; this is obviously not a physically correct case but allows convergence studies.

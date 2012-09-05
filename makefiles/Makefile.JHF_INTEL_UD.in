@@ -1,0 +1,18 @@
+# --------------------------------------
+# --------------------------------------
+# --------------------------------------
+#
+# Makefile.JHF_INTEL.in
+#
+
+PARMETIS_INC = -I/opt/parmetis-3.1/intel/mvapich-1.0.1.gen2-ud/include
+PARMETIS_LIB = -L/opt/parmetis-3.1/intel/mvapich-1.0.1.gen2-ud/lib -lparmetis
+METIS_LIB = -lmetis
+
+HYPRE_INC = -I/opt/hypre-2.0.0/intel/mvapich-1.0.1.gen2-ud/include 
+HYPRE_LIB = -L/opt/hypre-2.0.0/intel/mvapich-1.0.1.gen2-ud/lib -lHYPRE
+
+CC = /share/apps/mvapich-1.0.1.trunk.ud/intel/bin/mpicxx
+CFLAGS = -O3 -I. -Wno-deprecated -I. -DNO_ASSERT -DWITH_PARMETIS -DWITH_HYPRE $(PARMETIS_INC) $(HYPRE_INC) 
+CLIBS = $(PARMETIS_LIB) $(HYPRE_LIB) $(METIS_LIB)
+

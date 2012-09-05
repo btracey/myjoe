@@ -1,0 +1,89 @@
+
+
+################################
+#     GAS PROPERTIES
+# -----------------------------
+
+#RUNTIME = 0.01
+
+FAKT_BL = 0.1
+
+RHO_REF = 0.077
+P_REF = 2367.22
+T_REF = 107.1
+U_INITIAL = 609.1 0.0 0.0 #0.296 0.0 0.0
+MU_MODE = SUTHERLAND
+MU_REF = 1.716e-5
+GAMMA = 1.4
+
+#HEIGHT = 32400
+
+#RESTART = ./restart.in
+RESTART = ./plate.msh
+#RESTART = ./long_plate.msh
+
+################################
+#      SOLVER SETTINGS
+# -----------------------------
+#RESET_STEP
+NSTEPS = 1000
+CHECK_INTERVAL = 1
+WRITE_RESTART = 1000
+
+TIME_INTEGRATION = BACKWARD_EULER    # implicit (backward) euler
+#TIME_INTEGRATION = FORWARD_EULER    # implicit (backward) euler
+
+LINEAR_SOLVER_NS = PETSC_GMRES 
+LINEAR_SOLVER_NS_TRESHOLDS  MAX_ITER=30  ABS_RESID=1.0e-8  REL_RESID=1.0e-2
+UNDER_RELAXATION = 0.8
+LINEAR_SOLVER_SCALARS = PETSC_GMRES  # or PETSC gmres
+
+SPATIAL_SECOND_ORDER    # if line is commented then first order in space for inviscid fluxes
+#GRAD_RECONSTRUCTION  SCHEME=GREENGAUSS  LIMITER=YES  EPS=0.01
+GRAD_RECONSTRUCTION  SCHEME=GREENGAUSS  LIMITER=YES  EPS=0.01
+
+#DT = 0.002
+CFL = 1.0
+#CFL = 0.50
+CFL_RAMP AFTER_ITER=100  INTERVAL_ITER=10  FACTOR_CFL=1.05  MAX_CFL=100.0 
+
+#################################
+# BOUNDARY CONSITIONS
+
+inlet = CBC 604.5 0.0 0.0 107.1 2295.8278
+#inlet =  HOOK #CBC 604.5 0.0 0.0 107.1 2295.8278
+outlet = NEUMANN #CBC 604.5 0.0 0.0 108.1 2295.8278
+wall = WALL TEMP = 307.0
+#upperside = SYMMETRY #NEUMANN
+upperside = NEUMANN
+symm = SYMMETRY
+
+RELAX_kine = 0.4
+RELAX_omega = 0.4
+RELAX_SA = 0.4
+
+
+SST_LIMIT_PK = 1
+
+INITIAL_CONDITION_TURB = 10.0 1000.0
+inlet.kine = 10.0
+outlet.kine = 10.0
+wall.kine = 0.0
+
+inlet.omega = 1000.0
+outlet.omega = 1000.0
+wall.omega = HOOK
+
+inlet.nuSA = .00101 
+outlet.nuSA = .00101
+wall.nuSA = 0.0
+
+inlet.passiveScal = 1.0
+outlet.passiveScal = 1.0
+#wall.passiveScal = 1.0
+#upperside.passiveScal = 1.0
+
+
+
+WRITE_DATA FORMAT=TECPLOT NAME=long_sa INTERVAL=50 GEOM=ALL VARS= RHO vel RHOE press temp muT muLam nuSA kine omega vgrad_diag vgrad_offdiag residField passiveScal
+

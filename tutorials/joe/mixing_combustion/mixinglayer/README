@@ -1,0 +1,33 @@
+Supersonic mixing layer
+***********************
+
+This simple test case simulates a 2D mixing layer between two different gases at supersonic speed. See the file
+"mixture_fraction.jpg" for a preview of the solution and the configuration.
+
+The two streams are supersonic:
+* Upper stream: air (N2+O2) with U=1800m/s, T=1550K, P=0.4bar, Z=0
+* Lower stream: fuel (H2)   with U=1500m/s, T=300K,  P=0.4bar, Z=1
+
+The test case can be run either with
+* BinaryMixing: mixing of 2 perfect gases; cp, gamma of individual gases remain constant (no temperature dependence)
+* Mixing: mixing of 2 gases; cp, gamma depend on temperature (use NASA polynomials and Newton iteration). Note that
+          mixing requires the thermo input file "batesgri.thermo.bin" provided in the upper directory.
+
+To switch from one case to the other, comment out correct line in "joe.cpp" (line 22-23) where the class mixlayer is
+derived from either RansCombBinaryMixing or RansCombMixing. Note that the energy/enthalpy definition is different
+for the two cases, so that you should not use a restart file created with one case with the other case.
+
+The mesh is "mixinglayer_fine.msh". The wall separating the 2 gases is infinitely thin and goes from inflow until x=0.
+
+The turbulence model used is k-omega SST but other Spalart-Allmaras or Wilcox k-omega can also be used by passing the 
+correct argument to the executable.
+
+A sample convergence study is shown in the file "convergence.png" where different cases have been compared. The figure
+was created with gnuplot using the script "gnuplot_script". 
+
+NOTES:
+******
+
+* if you use RansCombMixing, you will not completely converge the solution; if you comment out the precompilation flag
+  ' #define MIXING_VISCOSITY ' in RansCombMixing.h, the viscosity will not be computed from mixing rules but through a 
+  standard Sutherland law; this will allow you to converge completely (the issue is due to the quality of the mesh).

@@ -1,0 +1,50 @@
+#!/bin/bash
+
+#PBS -N rand_bary_tall_32 
+#PBS -e rand_bary_tall_32.err
+#PBS -o rand_bary_tall_32.out
+#PBS -m aeb
+#PBS -V
+#PBS -M memory@stanford.edu
+#PBS -l nodes=16:ppn=8
+#PBS -l walltime=23:59:00
+
+RUN_HOME='/home/memory/JOE_RUNS/GEN_RAND_BARY_tall_r1'
+cd $RUN_HOME
+
+NPROCS=4
+
+for i in {1..32}
+do
+	cd $RUN_HOME
+	export PBS_O_WORKDIR=$RUN_HOME'/run_'$i
+	
+	PROG=$RUN_HOME"/REUSE/./joe"
+	ARGS=""
+	
+	### ---------------------------------------
+	### BEGINNING OF EXECUTION
+	### ---------------------------------------
+	
+	echo The master node of this job is `hostname`
+	echo The working directory is `echo $PBS_O_WORKDIR`
+	
+	
+	cd $PBS_O_WORKDIR
+	cmd="mpiexec -n $NPROCS $PROG $ARGS"
+	echo "Running: $cmd in directory: "`pwd`
+	
+	$cmd > $PBS_O_WORKDIR/log.$PBS_JOBID-$i &
+	sleep 60 # enough time to get into compute only, no more reading
+done
+
+#check all jobs done
+for j in {1..32}
+do
+	cd $RUN_HOME'/run_'$j
+	until [ -f fin.txt ]
+	do
+		sleep 30
+	done
+	echo "run_$j done"
+done

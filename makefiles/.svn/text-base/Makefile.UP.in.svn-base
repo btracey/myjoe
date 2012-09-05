@@ -1,0 +1,14 @@
+
+# LLNL's unclassified purple: uP
+
+PARMETIS_INC = -I$(HOME)/ParMetis-3.1.up
+PARMETIS_LIB = -L$(HOME)/ParMetis-3.1.up -lparmetis
+METIS_LIB = -lmetis
+
+HYPRE_INC = -I$(HOME)/hypre-2.0.0.up/src/hypre/include
+HYPRE_LIB = -L$(HOME)/hypre-2.0.0.up/src/hypre/lib -lHYPRE
+
+CC = mpxlC
+CFLAGS  = -c -q64 -O3 -qtune=auto -qarch=auto -qstrict -DDEBUG -DWITH_PARMETIS -DWITH_HYPRE -DNO_ASSERT -I. $(PARMETIS_INC) $(HYPRE_INC)
+CLD = -q64 -blpdata -O3 -qtune=auto -qarch=auto -qstrict $(PARMETIS_LIB) $(HYPRE_LIB) $(METIS_LIB)
+#CLIBS = -lmpi -lmpi++

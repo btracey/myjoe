@@ -1,0 +1,17 @@
+# --------------------------------------
+# --------------------------------------
+# --------------------------------------
+#
+# Makefile.CASCADE.in
+#
+
+PARMETIS_INC = -I$(HOME)/ParMetis-3.1
+PARMETIS_LIB = -L$(HOME)/ParMetis-3.1 -lparmetis
+METIS_LIB = -L$(HOME)/ParMetis-3.1 -lmetis
+
+HYPRE_INC = -I$(HOME)/hypre-2.2.0b/src/hypre/include
+HYPRE_LIB = -L$(HOME)/hypre-2.2.0b/src/hypre/lib -lHYPRE
+
+CC = /home/honein/mvapich-1.0.1/bin/mpiCC
+CFLAGS = -O -I. -Wno-deprecated -DNO_ASSERT -DWITH_PARMETIS -DWITH_HYPRE $(PARMETIS_INC) $(HYPRE_INC) 
+CLIBS = $(PARMETIS_LIB) $(HYPRE_LIB) $(METIS_LIB)

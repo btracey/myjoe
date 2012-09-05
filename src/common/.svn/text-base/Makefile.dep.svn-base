@@ -1,0 +1,83 @@
+# Include files <file.h> dependencies for common files
+
+myMem_H = $(MUM_HOME)/src/common/myMem.h
+
+mpi_tommie_H = $(MUM_HOME)/src/common/mpi_tommie.h
+
+MpiStuff_H = $(MUM_HOME)/src/common/MpiStuff.h \
+             $(mpi_tommie_H) 
+
+Gp_H = $(MUM_HOME)/src/common/Gp.h \
+       $(MpiStuff_H)
+
+MiscUtils_H = $(MUM_HOME)/src/common/MiscUtils.h \
+              $(MpiStuff_H)
+
+Ugp_H = $(MUM_HOME)/src/common/Ugp.h \
+        $(MpiStuff_H) \
+        $(MiscUtils_H) \
+        $(Gp_H)
+
+Param_H = $(MUM_HOME)/src/common/Param.h \
+          $(MiscUtils_H)
+
+Adt_H = $(MUM_HOME)/src/common/Adt.h
+
+Average_H = $(MUM_HOME)/src/common/Average.h \
+            $(MpiStuff_H)
+
+UgpWithTools_H = $(MUM_HOME)/src/common/UgpWithTools.h \
+                 $(Ugp_H) \
+                 $(Param_H) \
+                 $(Adt_H) \
+                 $(Average_H)
+
+CdpFilter_H = $(MUM_HOME)/src/common/CdpFilter.h \
+              $(MiscUtils_H) \
+              $(Ugp_H)
+
+MshFilter_H = $(MUM_HOME)/src/common/MshFilter.h \
+              $(MiscUtils_H) \
+              $(Ugp_H)
+
+tc_vec3d_H = $(MUM_HOME)/src/common/tc_vec3d.h
+
+UgpWithCv_H = $(MUM_HOME)/src/common/UgpWithCv.h \
+              $(UgpWithTools_H) \
+              $(CdpFilter_H) \
+              $(MshFilter_H) \
+              $(tc_vec3d_H)
+
+UgpWithCvFake_H = $(MUM_HOME)/src/common/UgpWithCvFake.h \
+                  $(UgpWithTools_H) \
+                  $(CdpFilter_H) \
+                  $(MshFilter_H) \
+                  $(tc_vec3d_H)
+
+AtmosphericCond_H = $(MUM_HOME)/src/common/AtmosphericCond.h
+
+HypreSolver_H = $(MUM_HOME)/src/common/HypreSolver.h
+
+PetscSolver_H = $(MUM_HOME)/src/common/PetscSolver.h 
+
+CTR_TOMMIETOO_LOGGING_H = $(MUM_HOME)/src/common/Logging.h
+
+
+# Combustion models
+###################
+
+CombustionGeneralDefinitions_H = $(MUM_HOME)/src/common/mixing_combustion/CombustionGeneralDefinitions.h \
+                                 $(Param_H) \
+                                 $(myMem_H)
+
+ChemistryTable_H = $(MUM_HOME)/src/common/mixing_combustion/ChemistryTableCartesianCubic.h \
+                   $(MUM_HOME)/src/common/mixing_combustion/ChemistryTableCartesianLinear.h \
+                   $(MUM_HOME)/src/common/mixing_combustion/ChemistryTableAdaptiveLinear.h \
+                   $(CombustionGeneralDefinitions_H)
+
+Combustion_H = $(MUM_HOME)/src/common/mixing_combustion/Combustion.h \
+               $(CombustionGeneralDefinitions_H)
+
+Flamelet_H = $(MUM_HOME)/src/common/mixing_combustion/Flamelet.h \
+             $(Combustion_H) \
+             $(CombustionGeneralDefinitions_H)

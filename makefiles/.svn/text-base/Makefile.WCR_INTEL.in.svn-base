@@ -1,0 +1,22 @@
+# --------------------------------------
+# --------------------------------------
+# --------------------------------------
+#
+# Makefile.WCR_INTEL.in
+#
+
+PETSC_DIR = /share/apps/petsc-3.0.0-p4/intel-mvapich
+PETSC_INC = -I${PETSC_DIR}/include
+include ${PETSC_DIR}/conf/variables
+
+PARMETIS_INC = -I/opt/parmetis/intel/include
+PARMETIS_LIB = -L/opt/parmetis/intel/lib -lparmetis
+METIS_LIB = -L/opt/parmetis/intel/lib -lmetis
+
+HYPRE_INC = -I/opt/hypre-2.0.0/intel/include 
+HYPRE_LIB = -L/opt/hypre-2.0.0/intel/lib -lHYPRE
+
+CC = /share/apps/mvapich/intel/bin/mpicxx
+CFLAGS = -O3 -I. -Wno-deprecated -I. -DNO_ASSERT -DWITH_PARMETIS -DWITH_HYPRE -DWITH_PETSC $(PARMETIS_INC) $(HYPRE_INC) $(PETSC_INC)
+CLIBS = $(PARMETIS_LIB) $(HYPRE_LIB) $(METIS_LIB) $(PETSC_LIB)
+

@@ -1,0 +1,26 @@
+####---------------------------------------------------------------
+#### pino
+####---------------------------------------------------------------
+
+#PARMETIS_INC = -I/opt/parmetis
+#PARMETIS_LIB = -L/opt/parmetis -lparmetis
+#METIS_LIB = -lmetis
+
+#MPI_INC = -I/opt/mpich2/include
+#MPI_LIB = -L/opt/mpich2/lib -lmpich++ 
+
+CC = icpc
+#CC = mpicxx
+
+#CFLAGS  = -D NO_MPI -64 -O3 -D FAST  -I.  -Wno-deprecated
+CFLAGS  = -D DEBUG -D NO_MPI -D NO_ASSERT -O3 -I. # $(PARMETIS_INC) $(MPI_INC) #-LANG:std -OPT:Olimit=0 -C
+#CLD = #-LANG:std -64
+#CLIBS = $(PARMETIS_LIB) $(MPI_LIB) $(METIS_LIB) # -lmpi -lmpi++ $(METIS_LIB)
+
+
+###
+####----MPI
+#CFLAGS  = -64 -O0 -D FAST  -I.  -LANG:std -OPT:Olimit=0 -C
+#CLD = -LANG:std -64 -lmpi -lmpi++
+#CLIBS = -lmpi -lmpi++
+

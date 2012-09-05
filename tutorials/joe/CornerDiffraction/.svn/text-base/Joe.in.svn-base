@@ -1,0 +1,82 @@
+##############################################################
+### Shock refraction around 90 corner input file (Quirk)
+##############################################################
+
+##############################################################
+#     LOG OUTPUT LEVEL
+# ---------------------------------------------------------- #
+#LOGGING_LEVEL = DEBUG_HI            # show all linear solver residuals
+#LOGGING_LEVEL = INFO_LO             # show part of the linear solver residuals
+LOGGING_LEVEL = INFO                 # show standard output 
+
+##############################################################
+#     INITIAL CONDITIONS - GAS PROPERTIES
+# ---------------------------------------------------------- #
+RHO_REF = 1.4
+P_REF = 1.0
+T_REF = 1.0
+U_INITIAL = 0.0 0.0 0.0
+#MU_REF = 5.544e-6
+GAMMA = 1.4
+
+RESTART = 400x400.msh
+#RESTART = restart.in
+
+##############################################################
+#     TIME INTEGRATION
+# ---------------------------------------------------------- #
+DT = 0.0025
+#CFL_MIN = 1.0
+
+NSTEPS = 600
+CHECK_INTERVAL = 10
+WRITE_RESTART = 10000
+INITIAL_FLOWFIELD_OUTPUT = YES
+#RESET_STEP                    # comment out to reset iteration counter
+
+TIME_INTEGRATION = RK
+
+##############################################################
+#     SPATIAL INTEGRATION 
+# ---------------------------------------------------------- #
+SPACE_INTEGRATION = AUSMDV     # HLLC, HAENEL, AUSMD, AUSMV, AUSMDV
+SHOCK_FIX_TYPE = HAENEL        # NONE, HAENEL, ALPHA_LR
+SHOCK_FIX_FLAG = CELL_FLAG_HEX # CELL_FLAG_HEX, CELL_FLAG_TET
+ENTROPY_FIX = EXPANSION_FAN    # NONE, EXPANSION_FAN
+
+SPATIAL_SECOND_ORDER           # comment out for first order
+GRAD_RECONSTRUCTION = SCHEME=GREENGAUSS LIMITER=YES EPS=0.01
+#GRAD_RECONSTRUCTION = SCHEME=LEASTSQUARES LIMITER=YES EPS=0.01
+
+##############################################################
+#     LINEAR SOLVER SETTINGS
+# ---------------------------------------------------------- #
+UNDER_RELAXATION = 0.6
+LINEAR_SOLVER_NS = PETSC_GMRES       # PETSC_GMRES, BCGSTAB
+LINEAR_SOLVER_NS_TRESHOLDS  MAX_ITER=30  ABS_RESID=1.0e-8  REL_RESID=1.0e-2
+
+##############################################################
+#     BOUNDARY CONDITIONS
+# ---------------------------------------------------------- #
+
+### CBC has [ux uy uz temperature pressure]
+Inflow = CBC 0.406 0.0 0.0 1.190633245 1.805      #Inflow = CBC_SUBSONIC_INLET 1.0 0.0 0.0 1.223600445 1.986062363
+#Inflow = CBC 1.157 0.0 0.0 2.040161893 6.553
+Outflow = SYMMETRY #NEUMANN
+Upper   = SYMMETRY #NEUMANN
+Lower   = SYMMETRY #NEUMANN 
+Wall1   = SYMMETRY
+Wall2   = SYMMETRY
+z0      = SYMMETRY
+z1      = SYMMETRY
+
+
+#################################
+#      OUTPUT SETTINGS 
+# -------------------------------
+
+WRITE_DATA FORMAT=TECPLOT NAME=fluid INTERVAL=50 GEOM=ALL VARS=RHO RHOU RHOE vel press temp residField enthalpy ShockFixFlagCell
+
+
+
+

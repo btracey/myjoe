@@ -1,0 +1,20 @@
+### Vincent E. Terrapon
+### April 2012
+
+Strong expansion in shock tube
+******************************
+
+The case considers a strong expansion in a 1D shock tube to test the different spatial integration schemes in strong expansions.
+
+To run the case:
+> ./run
+
+You can delete all created files and go back to a clean sheet by using:
+> ./run_clean
+
+The script runs the code and output the results with gnuplot. Additionally, tex files of the solution are also created for incorporation into a latex document.
+
+The exact solution is given in 
+"An accurate and robust flux splitting scheme for shock and contact discontinuities", Wada & Liou, SIAM Journal on Scientific Computing, vol.18, p.633, 1997.
+One can observe that none of the approximate Riemann solvers can correctly capture the temperature profile.
+

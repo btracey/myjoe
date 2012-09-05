@@ -1,0 +1,15 @@
+SHOCK DIFFRACTION AROUND 90 DEGREES CORNER
+******************************************
+
+This tutorial considers the shock diffraction around a sharp corner for an inviscid flow. Two different cases are considered:
+* weak shock, where the post-shock conditions are subsonic
+* strong shock, where the post-shock conditions are supersonic.
+Different meshes with increasing resolution are provided.
+
+To run, the case:
+> tar xzvf meshes.tar.gz 
+> cp $MUM_HOME/makefiles/Makefile .
+> make joe
+
+* edit Joe.in (comment/uncomment the boundary conditions, time step and number of steps depending on the mesh and case)
+* run joe

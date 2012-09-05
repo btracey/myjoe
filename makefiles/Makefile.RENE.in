@@ -1,0 +1,28 @@
+####---------------------------------------------------------------
+#### RENE's linux workstation
+####---------------------------------------------------------------
+
+PETSC_DIR = /opt/petsc/
+PETSC_INC = -I${PETSC_DIR}/include 
+include ${PETSC_DIR}/conf/variables
+
+PARMETIS_INC = -I/opt/parmetis
+PARMETIS_LIB = -L/opt/parmetis -lparmetis
+METIS_LIB = -lmetis
+
+MPI_INC = -I/opt/mpich2-1.2/include
+MPI_LIB = -L/opt/mpich2-1.2/lib -lmpichcxx 
+
+
+CC = mpicxx
+F90 = ifort
+
+CFLAGS = -D DEBUG -D NO_ASSERT -D WITH_PARMETIS -O3 -D WITH_PETSC -g -fno-inline -I. $(PARMETIS_INC) $(MPI_INC) $(PETSC_INC)
+ 
+CLD = -g  #-LANG:std -64
+CLIBS = $(PARMETIS_LIB) $(MPI_LIB) $(METIS_LIB) $(PETSC_LIB) 
+
+
+
+
+

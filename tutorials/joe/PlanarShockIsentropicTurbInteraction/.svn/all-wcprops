@@ -1,0 +1,41 @@
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/repos/MUM/!svn/ver/382/tutorials/joe/PlanarShockIsentropicTurbInteraction
+END
+collection.lay
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/repos/MUM/!svn/ver/382/tutorials/joe/PlanarShockIsentropicTurbInteraction/collection.lay
+END
+Joe.in
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/repos/MUM/!svn/ver/382/tutorials/joe/PlanarShockIsentropicTurbInteraction/Joe.in
+END
+run
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/repos/MUM/!svn/ver/382/tutorials/joe/PlanarShockIsentropicTurbInteraction/run
+END
+dns.dat
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/repos/MUM/!svn/ver/382/tutorials/joe/PlanarShockIsentropicTurbInteraction/dns.dat
+END
+box.msh
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/repos/MUM/!svn/ver/382/tutorials/joe/PlanarShockIsentropicTurbInteraction/box.msh
+END
+joe.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/repos/MUM/!svn/ver/382/tutorials/joe/PlanarShockIsentropicTurbInteraction/joe.cpp
+END

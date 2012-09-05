@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/repos/MUM/!svn/ver/434/trunk/src/joe/turbModels
+END
+TransModel_GaReT.h
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/repos/MUM/!svn/ver/410/trunk/src/joe/turbModels/TransModel_GaReT.h
+END
+TurbModel_V2F.h
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/repos/MUM/!svn/ver/181/trunk/src/joe/turbModels/TurbModel_V2F.h
+END
+TurbModel_KOMSST.h
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/repos/MUM/!svn/ver/434/trunk/src/joe/turbModels/TurbModel_KOMSST.h
+END
+TurbModel_KEps.h
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/repos/MUM/!svn/ver/434/trunk/src/joe/turbModels/TurbModel_KEps.h
+END
+TurbModel_SA.h
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/repos/MUM/!svn/ver/434/trunk/src/joe/turbModels/TurbModel_SA.h
+END
+TurbModel_KOM.h
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/repos/MUM/!svn/ver/434/trunk/src/joe/turbModels/TurbModel_KOM.h
+END
+TurbModel_SA.h.uq
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/repos/MUM/!svn/ver/325/trunk/src/joe/turbModels/TurbModel_SA.h.uq
+END

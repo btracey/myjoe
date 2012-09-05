@@ -1,0 +1,45 @@
+
+####---------------------------------------------------------------
+#### HYDRA -> SGI Origin 2000
+####---------------------------------------------------------------
+
+#
+# WITH_MPI
+#
+
+PARMETIS_INC = -I$(HOME)/ParMetis-3.1
+PARMETIS_LIB = -L$(HOME)/ParMetis-3.1 -lparmetis
+METIS_LIB = -lmetis
+
+#HYPRE_INC = -I$(HOME)/hypre-2.0.0/src/hypre/include
+#HYPRE_LIB = -L$(HOME)/hypre-2.0.0/src/hypre/lib -lHYPRE
+
+CC = CC
+
+###
+####----NO MPI
+#CFLAGS  = -D NO_MPI -64 -O3 -D FAST  -I.  -Wno-deprecated
+
+#CFLAGS  = -D DEBUG -D WITH_PARMETIS -64 -O3 -I. $(PARMETIS_INC) -LANG:std -OPT:Olimit=0 -C -ptused
+CFLAGS  = -D DEBUG -D WITH_PARMETIS -64 -O3 -I. $(PARMETIS_INC) -LANG:std -OPT:Olimit=0
+CLD = -LANG:std -64 -v -O3
+CLIBS = $(PARMETIS_LIB) -lmpi -lmpi++ $(METIS_LIB)
+
+###
+####----MPI
+#CFLAGS  = -64 -O0 -D FAST  -I.  -LANG:std -OPT:Olimit=0 -C
+#CLD = -LANG:std -64 -lmpi -lmpi++
+#CLIBS = -lmpi -lmpi++
+
+AR = ar rcv
+RANLIB = ar -ts
+
+# for Fortran guys...
+F90 = f90
+#F77 = f77
+
+# example flags for you...
+FFLAGS = -mips4 -O3 -64 -OPT:Olimit=0
+#F77FLAGS = -mips4 -O3 -64 -OPT:Olimit=0
+FLD = -v -64 -O3
+FLIBS = $(PARMETIS_LIB) -lmpi -lmpi++ $(METIS_LIB) -L/usr/lib64/mips4/r10000 -L/usr/lib64/mips4 -L/usr/lib64 /usr/lib64/mips4/crt1.o /usr/lib64/c++init.o -lCsup -lC -lCio -Bdynamic -lc /usr/lib64/mips4/crtn.o -lm

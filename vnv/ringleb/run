@@ -1,0 +1,47 @@
+#!/bin/bash
+### author: Rene Pecnik, Aug 09 
+
+rm convergence.dat mail.txt RESID Makefile
+
+### first make joe
+cp $MUM_HOME/makefiles/Makefile .
+make joe
+
+### then run joe
+for i in `seq 1 1` ; do 
+    ### create Joe.in from template
+    sed "/RESTART/ s/msh/Ringleb_$i.msh/" JoeTemplate.in > Joe.in
+    tar -xvf Ringleb_$i.tar.gz 
+    ### run joe
+    mpirun -np 1 ./joe >dummy  
+    rm Ringleb_$i.msh   
+ 
+    ### prepare files
+    cat dummy | grep 'Final L2 Error' >> convergence.dat
+    cat dummy | grep RESID | tail -1 >> RESID
+    
+    # generate data file
+    L=0.1
+    DX=$(echo "scale=8; $L/(2^$i)" | bc)
+    DX2=$(echo "20*($DX ^ 2)" | bc)
+    sed "/Final L2 Error/ s/XXX/$DX/" convergence.dat > tmp
+    sed "/Final L2 Error/ s/YYY/$DX2/" tmp > convergence.dat
+    echo "finshed run with dx=$DX"
+done
+
+### make plot
+gnuplot < gnuplotscript
+
+
+### if you want to send the results via mail, uncomment the 4 lines below and change the email address in the file run_vnv in mum's root directory
+cp README mail.txt
+cat RESID >> mail.txt
+cat convergence.dat >> mail.txt
+#cat $MUM_HOME/run_vnv | grep 'email=' | awk '{print $2}' | while read line ; do mutt -s "ringleb" -a convergence.png $line< mail.txt; done 
+mutt -s "ringleb" -a convergence.png renep@stanford.edu < mail.txt
+
+### clean up 
+#rm Joe.in joe joe.o convergence.* fluid* restart.out tmp dummy RESID mail.txt Makefile
+
+
+

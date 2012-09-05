@@ -1,0 +1,141 @@
+#LOGGING_LEVEL = DEBUG_HI            # show all linear solver residuals
+LOGGING_LEVEL = INFO_LO             # show part of the linear solver residuals
+#LOGGING_LEVEL = INFO                 # show standard output 
+
+################################
+#     GAS PROPERTIES
+################################
+
+CHEMTABLE_FILE = ./database_H2Stanford_v2_lin
+OUTPUT_SPECIES = OH SRC_PROG HeatRelease
+
+################################
+#     INITIAL CONDITIONS
+################################
+P_REF = 120000.0
+T_REF = 1300.0
+RHO_REF = 0.32
+GAMMA = 1.3
+MU_REF =  1.716e-5
+MU_MODE = SUTHERLAND
+SL_TREF = 273.15                      # Tref for Sutherland law	
+SL_SREF = 110.4                       # Sref for Sutherland law
+
+################################
+#      SOLVER SETTINGS
+# -----------------------------
+
+# Mesh and restart file
+RESTART = ./restart.018328.out
+
+CFL = 0.05                            # constant CFL number in the whole flow field 
+CFL_RAMP AFTER_ITER=1000  INTERVAL_ITER=1000  FACTOR_CFL=1.1  MAX_CFL=1.5  # only for TIME_INTEGRATION = BACKWARD_EULER
+
+NSTEPS = 500000                        # number of time iterations 
+CHECK_INTERVAL = 1                    # interval print residuals
+WRITE_RESTART = 10000                  # write restart interval
+INITIAL_FLOWFIELD_OUTPUT = NO         # output initial flowfield (YES / NO)
+#RESET_STEP
+RUNTIME = 23.7
+
+RESID_ENERG_TH = 1.0e-2  # stop criteria for iterations when energy residual is less then value
+
+TIME_INTEGRATION = BACKWARD_EULER
+#TIME_INTEGRATION = BACKWARD_EULER_SEMICOUPLED
+
+SYMM_BC = NEW_NUMERIC 
+SPACE_INTEGRATION = HLLC
+CONVERGENCE_HISTORY = YES
+COMBUSTION_REGIME = COLD_SOURCE
+TIME_STEP = SUM_BASED
+
+LINEAR_SOLVER_NS = PETSC_GMRES 
+LINEAR_SOLVER_NS_TRESHOLDS  MAX_ITER=1  ABS_RESID=1.0e-8  REL_RESID=1.0e-2
+
+UNDER_RELAXATION = 1.0
+UNDER_RELAXATION_SCALARS = 1.0
+
+LINEAR_SOLVER_SCALARS = BCGSTAB
+
+# limiter for spatial gradients
+#SPATIAL_SECOND_ORDER
+#SCALAR_FIRST_ORDER  
+GRAD_RECONSTRUCTION  SCHEME=GREENGAUSS  LIMITER=YES  EPS=0.01
+SCALAR_RECONSTRUCTION = STANDARD
+VISC_LIM = YES
+
+# Schmidt number for the scalars ZMean, ZVar and CMean and Prandtl number
+SCTURB_ZMean = 0.5
+SCTURB_ZVar  = 0.5
+SCTURB_CMean = 0.5
+PRTURB = 0.5
+Cchi = 2.0
+
+
+#################################
+#     BOUNDARY CONDITIONS
+# -------------------------------
+
+# ---- for Navier-Stokes  --------------------------------------------------------------------------
+# boundary_name = HOOK                                  # provide velocity, temperature and pressure
+# boundary_name = CBC ux uy uz temperature pressure
+# boundary_name = CBC_SUBSONIC_INLET ux/vel uy/vel uz/vel Ttot ptot
+# boundary_name = CBC_SUBSONIC_OUTLET pstat
+# boundary_name = SYMMETRY                              # slip BC
+# boundary_name = NEUMANN                               # van Neumann BC
+# boundary_name = WALL                                  # no slip BC with adiabatic wall
+# boundary_name = WALL TEMP=temperature                 # no slip BC with isothermal wall
+
+# ---- for scalars ---------------------------------------------------------------------------------
+# boundary_name.scalar_name = value       # Dirichlet 
+# boundary_name.scalar_name = HOOK        # HOOK 
+# if no boundary condition is set for scalars: von Neumann BC is applied 
+
+inlet          = HOOK
+outlet         = NEUMANN
+bodywall       = WALL TEMP = 300.0
+cowlwall       = WALL TEMP = 300.0
+z0             = SYMMETRY
+z1             = SYMMETRY
+injector       = CBC_SUBSONIC_INLET  0.0 1.0 0.0 300.0 5.00e5   # phi=0.30
+#injector       = CBC_SUBSONIC_INLET  0.0 1.0 0.0 300.0 5.83e5   # phi=0.35
+#injector       = CBC_SUBSONIC_INLET  0.0 1.0 0.0 300.0 6.65e5   # phi=0.40
+#injector       = CBC_SUBSONIC_INLET  0.0 1.0 0.0 300.0 7.48e5   # phi=0.45
+#injector       = CBC_SUBSONIC_INLET  0.0 1.0 0.0 300.0 8.30e5   # phi=0.50
+
+#  scalars
+inlet.ZMean    = 0.0
+injector.ZMean = 1.0
+inlet.ZVar     = 0.0
+injector.ZVar  = 0.0
+inlet.CMean    = 0.0
+injector.CMean = 0.0
+
+# -------------------------------
+# KOM models
+# -------------------------------
+INITIAL_CONDITION_TURB = 1.0e4 5.0e5
+
+X_TRANSITION = 0.4
+Y_TRANSITION = 0.12436
+
+SST_LIMIT_PK = 1
+SST_LIMITER_SHEARSTRESS = 1
+
+inlet.kine     = HOOK
+injector.kine  = 0.04     #  0.2% turbulence intensity at phi=0.30
+bodywall.kine  = 0.0
+cowlwall.kine  = 0.0
+
+inlet.omega    = HOOK
+injector.omega = 2200.0     #  dissipation length scale of 1mm (half of injector diameter)
+bodywall.omega = HOOK
+cowlwall.omega = HOOK
+
+
+#################################
+#      OUTPUT SETTINGS 
+# -------------------------------
+
+WRITE_DATA FORMAT=TECPLOT NAME=fluid INTERVAL=10000 GEOM=ALL VARS= RHO vel RHOE press temp enthalpy gamma sos muT kine omega diverg ZMean ZVar CMean OH SRC_PROG HeatRelease residField
+

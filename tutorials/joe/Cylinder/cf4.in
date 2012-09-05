@@ -1,0 +1,31 @@
+## WOODWARD_COLELLA
+RESTART = restart.in
+#RESTART = tests/WoodwardCollela/restart.medium.cdp
+RHO_REF = 1.4
+P_REF = 1.0
+GAMMA = 1.4
+T_REF = 1.0
+MU_REF = 0.0
+MU_POWER_LAW = 0.0
+## coarse...
+DT = 0.001
+NSTEPS = 10000
+## medium...
+#DT = 0.001
+#NSTEPS = 3000
+ZERO = 1.0E-8
+
+
+U_INF = 5.0
+
+
+inflow = CBC 1.4 5.0 0.0 0.0 1.0
+outflow = CBC 1.4 5.0 0.0 0.0 1.0
+cylinder = SYMMETRY
+
+z0 = SYMMETRY
+z1 = SYMMETRY
+
+
+CHECK_INTERVAL = 10
+WRITE_DATA FORMAT TECPLOT NAME all INTERVAL 500 GEOM ALL VARS RHO RHOU RHOE DIV

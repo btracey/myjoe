@@ -1,0 +1,97 @@
+# Include files <file.h> dependencies for joe files
+
+UgpWithCvCompFlow_H = $(MUM_HOME)/src/joe/UgpWithCvCompFlow.h \
+                      $(MiscUtils_H) \
+                      $(tc_ved3d_H) \
+                      $(UgpWithCv_H) \
+                      $(CdpFilter_H) \
+                      $(MshFilter_H) \
+                      $(Param_H) \
+                      $(AtmosphericCond_H) \
+                      $(HypreSolver_H) \
+                      $(PetscSolver_H)
+
+JoeWithModels_H = $(MUM_HOME)/src/joe/JoeWithModels.h \
+                  $(UgpWithCvCompFlow_H)
+
+# Turbulent models
+###################
+
+TransModel_GARET_H = $(MUM_HOME)/src/joe/turbModels/TransModel_GaReT.h \
+                  $(UgpWithCvCompFlow_H)
+
+TurbModel_KOM_H = $(MUM_HOME)/src/joe/turbModels/TurbModel_KOM.h \
+                  $(UgpWithCvCompFlow_H)
+
+TurbModel_KEps_H = $(MUM_HOME)/src/joe/turbModels/TurbModel_KEps.h \
+                   $(UgpWithCvCompFlow_H)
+
+TurbModel_KOMSST_H = $(MUM_HOME)/src/joe/turbModels/TurbModel_KOMSST.h \
+                     $(UgpWithCvCompFlow_H)
+
+TurbModel_SA_H = $(MUM_HOME)/src/joe/turbModels/TurbModel_SA.h \
+                 $(UgpWithCvCompFlow_H)
+
+TurbModel_V2F_H = $(MUM_HOME)/src/joe/turbModels/TurbModel_V2F.h \
+                  $(UgpWithCvCompFlow_H)
+
+# EUQ Turbulent models
+####################
+
+EUQ_Turb_KOM_H = $(MUM_HOME)/src/joe/euqModels/EUQ_Turb_KOM.h \
+              $(UgpWithCvCompFlow_H)
+
+EUQ_Turb_SA_H = $(MUM_HOME)/src/joe/euqModels/EUQ_Turb_SA.h \
+                $(UgpWithCvCompFlow_H)
+
+EUQ_Turb_SST_H = $(MUM_HOME)/src/joe/euqModels/EUQ_Turb_SST.h \
+                 $(UgpWithCvCompFlow_H)
+
+# Combustion models
+###################
+
+CombModel_Base_H = $(MUM_HOME)/src/joe/combModels/CombModel_Base.h \
+                   $(UgpWithCvCompFlow_H) \
+                   $(ChemistryTable_H) \
+                   $(Combustion_H)
+
+CombModel_BinaryMixing_H = $(MUM_HOME)/src/joe/combModels/CombModel_BinaryMixing.h \
+                           $(CombModel_Base_H)
+
+CombModel_Mixing_H = $(MUM_HOME)/src/joe/combModels/CombModel_Mixing.h \
+                     $(CombModel_Base_H)
+
+CombModel_VariableProperties_H = $(MUM_HOME)/src/joe/combModels/CombModel_VariableProperties.h \
+                                 $(CombModel_Base_H)
+
+CombModel_VariablePropertiesAnalytic_H = $(MUM_HOME)/src/joe/combModels/CombModel_VariablePropertiesAnalytic.h \
+                                         $(CombModel_Base_H)
+
+CombModel_SteadyFlamelet_H = $(MUM_HOME)/src/joe/combModels/CombModel_SteadyFlamelet.h \
+                             $(CombModel_Base_H) 
+
+CombModel_FPVA_H = $(MUM_HOME)/src/joe/combModels/CombModel_FPVA.h \
+                   $(CombModel_Base_H) 
+
+CombModel_FPVA_Coeff_H = $(MUM_HOME)/src/joe/combModels/CombModel_FPVA_Coeff.h \
+                         $(CombModel_Base_H) 
+
+
+joe_H = $(JoeWithModels_H) \
+        $(TransModel_GARET_H) \
+        $(TurbModel_KOM_H) \
+        $(TurbModel_KEps_H) \
+        $(TurbModel_KOMSST_H) \
+        $(TurbModel_SA_H) \
+        $(TurbModel_V2F_H) \
+        $(EUQ_Turb_KOM_H) \
+        $(EUQ_Turb_SA_H) \
+        $(EUQ_Turb_SST_H) \
+        $(CombModel_VariableProperties_H) \
+        $(CombModel_VariablePropertiesAnalytic_H) \
+        $(CombModel_BinaryMixing_H) \
+        $(CombModel_Mixing_H) \
+        $(CombModel_SteadyFlamelet_H) \
+        $(CombModel_FPVA_H) \
+        $(CombModel_FPVA_Coeff_H)
+

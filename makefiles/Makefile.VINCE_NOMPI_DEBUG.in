@@ -1,0 +1,8 @@
+CC      = icpc
+#CFLAGS  = -D DEBUG -O3 -I.
+#CFLAGS  = -D DEBUG -D NO_MPI -I. -Wno-deprecated
+#CFLAGS  = -O1 -D DEBUG -D NO_MPI -I.
+CFLAGS  = -O1 -g -D NO_MPI -D NO_ASSERT -I. -D DEBUG #-D MPI_OFFSET_IS_LONG_LONG_INT
+#CFLAGS  = -O3 -D NO_MPI -I. -Wno-deprecated
+#CFLAGS  = -D DEBUG -D NO_MPI -I. -Wno-deprecated
+

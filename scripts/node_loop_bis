@@ -1,0 +1,14 @@
+#!/bin/bash
+# Loop over all nodes from $2-$4 to $3-$5 and perform command
+# Use: node_loop_bis i1 i2 j1 j2 'command'  (perform command on nodes from compute-i1-j1 to compute-i2-j2)
+# Example: node_loop_bis 24 76 1 4 'ps aux | grep terrapon'
+
+for i in `seq $2 $3` 
+do
+  for j in `seq $4 $5`
+  do
+    echo " "
+    echo compute-$i-$j
+    ssh compute-$i-$j -x "$1"
+  done
+done

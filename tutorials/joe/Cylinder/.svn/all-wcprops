@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/repos/MUM/!svn/ver/486/tutorials/joe/Cylinder
+END
+cf4.in
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/repos/MUM/!svn/ver/309/tutorials/joe/Cylinder/cf4.in
+END
+Joe.in
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/repos/MUM/!svn/ver/486/tutorials/joe/Cylinder/Joe.in
+END
+Joe.in_dimension
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/repos/MUM/!svn/ver/486/tutorials/joe/Cylinder/Joe.in_dimension
+END
+Joe.in_vanilla
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/repos/MUM/!svn/ver/486/tutorials/joe/Cylinder/Joe.in_vanilla
+END
+README
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/repos/MUM/!svn/ver/486/tutorials/joe/Cylinder/README
+END
+cyl.msh
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/repos/MUM/!svn/ver/309/tutorials/joe/Cylinder/cyl.msh
+END
+joe.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/repos/MUM/!svn/ver/486/tutorials/joe/Cylinder/joe.cpp
+END

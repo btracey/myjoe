@@ -1,0 +1,32 @@
+******************************************************
+* STEADY INVISCID FLOW AT MACH M=5 AROUND A CYLINDER *
+******************************************************
+
+This tutorial computes the steady inviscid flow around a cylinder. The inflow is at Mach M=5 (M=10 is commented out).
+Three different types of runs can be performed:
+* constant properties (gamma and R are fixed)
+* variable properties analytical (cp and gamma can change with temperature, the analytical function is linear)
+* variable properties (cp and gamma are function of the temperature and computed from NASA polynomials)
+
+
+RUN
+***
+* Copy first the Makefile from the joe code and compile
+	> cp $MUM_HOME/makefiles/Makefile .
+	> make joe
+
+* Run the code (constant properties, non-dimensional)
+	> mpirun -np 4 ./joe Joe.in 0 
+
+* The other options are
+  - constant properties, dimensional:
+	> mpirun -np 4 ./joe Joe.in_dimensions 0
+
+  - analyical variable properties (dimensional)
+	> mpirun -np 4 ./joe Joe.in_dimensions 1
+
+  - variable properties from tables (always dimensional)
+	> mpirun -np 4 ./joe Joe.in_dimensions 2
+
+
+You can change the type of approximate Riemann solver (SPACE_INTEGRATION), different options are available: HLLC, HAENEL, AUSMDV, ...

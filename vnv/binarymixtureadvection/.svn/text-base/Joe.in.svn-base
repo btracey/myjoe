@@ -1,0 +1,117 @@
+#LOGGING_LEVEL = DEBUG_HI   # show all linear solver residuals
+#LOGGING_LEVEL = INFO_LO    # show part of the linear solver residuals
+LOGGING_LEVEL = INFO        # show standard output 
+
+################################
+#     GAS PROPERTIES
+################################
+
+######  BINARY MIXTURE  ########
+# Reference values for the two gases
+GAMMA_1 = 1.384
+#GAMMA_2 = 1.66
+GAMMA_2 = 1.342
+MOLMASS_1 = 2.016
+#MOLMASS_2 = 4.0026
+MOLMASS_2 = 28.9
+
+###### LINEAR MIXING OR COMBUSTION ######
+# Combustion corresponds to a single analytical flamelet
+# Set next 2 parameters to 0 for linear mixing rule
+NON_LIN_MIX_D_CP = 0.0 #900.0
+NON_LIN_MIX_D_R  = 0.0 #60.0
+
+NON_LIN_MIX_COEFF_1 = 50.0
+NON_LIN_MIX_COEFF_2 = 10.0
+NON_LIN_MIX_COEFF_3 = 10.0
+NON_LIN_MIX_COEFF_4 = 10.0
+
+###### REAL GAS MIXING  ########
+# File where thermo properties for each species are saved
+THERMO_INPUT_FILE = ./batesgri.thermo.bin
+
+# Species used for mixing
+NUMBER_SPECIES = 3
+SPECIES = N2 O2 H2
+# Species used to ensure sum of all species to be 1
+DOM_SPECIES = N2
+
+#Boundary conditions (left: Z=0 and right: Z=1)
+MIXING_BC_LEFT  = 0.767 0.233 0.0
+MIXING_BC_RIGHT = 0.0 0.0 1.0
+
+
+################################
+#     INITIAL CONDITIONS
+################################
+#INIT_PROFILE = SINE
+INIT_PROFILE = SMOOTH_HAT
+
+P_REF = 100000.0
+U_INITIAL = 1000.0 #100.0
+
+MU_REF = 0.0   
+#MU_REF =  1.716e-5
+MU_MODE = SUTHERLAND
+#SL_TREF = 273.15         # Tref for Sutherland law	
+#SL_SREF = 110.4          # Sref for Sutherland law
+PRANDTL = 1.0
+
+# 2 options: constant temperature or constant density
+# for both cases: constant pressure
+# ---------------------------------------------------
+#CASE = T_CST
+CASE = RHO_CST
+#CASE = T_FIXED
+
+T_REF = 1300.0
+RHO_REF = 0.26738
+T_FUEL = 300.0
+T_OXY = 1300.0
+
+################################
+#      SOLVER SETTINGS
+################################
+
+# Mesh and restart file
+RESTART = ./grids/restart.cart.0512x1x1.periodic.out
+
+# Time advancement parameters (Ramp: first increase, increase frequency, increase factor, max CFL)
+DT = 0.0000001         # ensure a CFL of 0.205 for the finest grid (2048 elements)
+NSTEPS = 100000        # NSTEPS=10000 ensure 1 period at the above time step
+CHECK_INTERVAL = 10
+WRITE_RESTART = 200000
+#CFL = 0.3                      # constant CFL number in the whole flow field 
+#CFL_MIN = 0.5                  # maximum time step corresponding to CFL_MIN, same dt for all cells 
+CFL_RAMP AFTER_ITER=1000  INTERVAL_ITER=100  FACTOR_CFL=1.05  MAX_CFL=2.5  # only for TIME_INTEGRATION = BACKWARD_EULER
+
+# Solvers
+#TIME_INTEGRATION = FORWARD_EULER     # explicit (forward) euler integration 
+TIME_INTEGRATION = RK                 # runge kutta   
+#TIME_INTEGRATION = BACKWARD_EULER    # implicit (backward) euler
+#TIME_INTEGRATION = BDF2              # backward difference 2nd order (implict)
+
+#LINEAR_SOLVER_NS = BCGSTAB
+LINEAR_SOLVER_NS = PETSC_GMRES 
+LINEAR_SOLVER_NS_TRESHOLDS  MAX_ITER=30  ABS_RESID=1.0e-8  REL_RESID=1.0e-6
+UNDER_RELAXATION = 0.4
+N_NEWTON_ITER = 4                     # number of Newton iterations for TIME_INTEGRATION = BDF2
+
+#LINEAR_SOLVER_SCALARS = BCGSTAB      # linear solver for scalars = BCGSTAB
+LINEAR_SOLVER_SCALARS = PETSC_GMRES   # or PETSC gmres
+
+# Spatial order (for 1st order, comment out)
+SPATIAL_SECOND_ORDER
+
+# limiter for spatial gradients
+GRAD_RECONSTRUCTION SCHEME=GREENGAUSS  LIMITER=YES  EPS=0.000001
+#GRAD_RECONSTRUCTION SCHEME=LEASTSQUARES  LIMITER=NO  EPS=0.000001
+SCALAR_RECONSTRUCTION = CONSERVATIVE
+
+
+################################
+#      OUTPUT SETTINGS 
+################################
+
+WRITE_DATA FORMAT=TECPLOT NAME=fluid INTERVAL = 500 GEOM=ALL VARS= RHO vel RHOE press temp sos gamma enthalpy RoM ZMean
+

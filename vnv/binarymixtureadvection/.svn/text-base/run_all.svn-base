@@ -1,0 +1,180 @@
+#!/bin/bash
+
+# check if Joe.in_template exists
+if [ ! -f "Joe.in_template" ]; then
+   echo "Joe.in_template could not be found!"
+   exit 1
+fi
+
+# compile
+make joe
+
+#initprofile="SMOOTH_HAT"
+initprofile="SINE"
+
+runname="binmix"
+
+limiter_eps="0.000001"
+
+#####################################################################
+# FIRST CASE
+#####################################################################
+dirname=${initprofile}_${runname}_conserv_Rhocst_limiter_Period_2                  # name of directory
+runtype=0                                                                          # 0: BinaryMixture, 1: Mixing
+nPeriods=2                                                                         # number of convection periods
+nInterval=500                                                                      # interval of output files
+
+# update input file
+cp Joe.in_template Joe.in_temp
+nSteps=$((10000*$nPeriods))
+perl -pi -e "s{INIT_PROFILE_TEMPLATE}{$initprofile}" Joe.in_temp                   # 2 possible cases: SINE or SMOOTH_HAT
+perl -pi -e "s{CASE_TEMPLATE}{RHO_CST}" Joe.in_temp                                # 2 possible cases: RHO_CST or T_CST
+perl -pi -e "s{LIMITER_TEMPLATE}{GREENGAUSS LIMITER=YES  EPS=$limiter_eps}" Joe.in_temp      # type of limiter
+perl -pi -e "s{SC_RECON_TEMPLATE}{CONSERVATIVE}" Joe.in_temp                       # conservative or standard scalar reconstruction
+perl -pi -e "s{NSTEPS_TEMPLATE}{$nSteps}" Joe.in_temp               
+perl -pi -e "s{INTERVAL_TEMPLATE}{$nInterval}" Joe.in_temp
+
+# run
+./scripts/run_order_accuracy $dirname $runtype
+
+# copy tecplot layout to visualize results
+cp ./layouts_tecplot/order_accuracy_cst_rho.lay ./$dirname
+
+rm Joe.in_temp
+
+
+#####################################################################
+# SECOND CASE
+#####################################################################
+dirname=${initprofile}_${runname}_conserv_Tcst_limiter_Period_2 
+runtype=0
+nPeriods=2
+nInterval=500
+
+# update input file
+cp Joe.in_template Joe.in_temp
+nSteps=$((10000*$nPeriods))
+perl -pi -e "s{INIT_PROFILE_TEMPLATE}{$initprofile}" Joe.in_temp
+perl -pi -e "s{CASE_TEMPLATE}{T_CST}" Joe.in_temp
+perl -pi -e "s{LIMITER_TEMPLATE}{GREENGAUSS LIMITER=YES  EPS=$limiter_eps}" Joe.in_temp
+perl -pi -e "s{SC_RECON_TEMPLATE}{CONSERVATIVE}" Joe.in_temp
+perl -pi -e "s{NSTEPS_TEMPLATE}{$nSteps}" Joe.in_temp
+perl -pi -e "s{INTERVAL_TEMPLATE}{$nInterval}" Joe.in_temp
+
+# run
+./scripts/run_order_accuracy $dirname $runtype
+
+# copy tecplot layout to visualize results
+cp ./layouts_tecplot/order_accuracy_cst_T.lay ./$dirname
+
+rm Joe.in_temp
+
+
+#####################################################################
+# THIRD CASE
+#####################################################################
+dirname=${initprofile}_${runname}_conserv_Tfixed_limiter_Period_2 
+runtype=0
+nPeriods=2
+nInterval=500
+
+# update input file
+cp Joe.in_template Joe.in_temp
+nSteps=$((10000*$nPeriods))
+perl -pi -e "s{INIT_PROFILE_TEMPLATE}{$initprofile}" Joe.in_temp
+perl -pi -e "s{CASE_TEMPLATE}{T_FIXED}" Joe.in_temp
+perl -pi -e "s{LIMITER_TEMPLATE}{GREENGAUSS LIMITER=YES  EPS=$limiter_eps}" Joe.in_temp
+perl -pi -e "s{SC_RECON_TEMPLATE}{CONSERVATIVE}" Joe.in_temp
+perl -pi -e "s{NSTEPS_TEMPLATE}{$nSteps}" Joe.in_temp
+perl -pi -e "s{INTERVAL_TEMPLATE}{$nInterval}" Joe.in_temp
+
+# run
+./scripts/run_order_accuracy $dirname $runtype
+
+# copy tecplot layout to visualize results
+cp ./layouts_tecplot/order_accuracy_cst_rho.lay ./$dirname
+
+rm Joe.in_temp
+
+
+#####################################################################
+# FOURTH CASE
+#####################################################################
+dirname=${initprofile}_${runname}_stand_Rhocst_limiter_Period_2 
+runtype=0
+nPeriods=2
+nInterval=500
+
+# update input file
+cp Joe.in_template Joe.in_temp
+nSteps=$((10000*$nPeriods))
+perl -pi -e "s{INIT_PROFILE_TEMPLATE}{$initprofile}" Joe.in_temp
+perl -pi -e "s{CASE_TEMPLATE}{RHO_CST}" Joe.in_temp
+perl -pi -e "s{LIMITER_TEMPLATE}{GREENGAUSS LIMITER=YES  EPS=$limiter_eps}" Joe.in_temp
+perl -pi -e "s{SC_RECON_TEMPLATE}{STANDARD}" Joe.in_temp
+perl -pi -e "s{NSTEPS_TEMPLATE}{$nSteps}" Joe.in_temp
+perl -pi -e "s{INTERVAL_TEMPLATE}{$nInterval}" Joe.in_temp
+
+# run
+./scripts/run_order_accuracy $dirname $runtype
+
+# copy tecplot layout to visualize results
+cp ./layouts_tecplot/order_accuracy_cst_rho.lay ./$dirname
+
+rm Joe.in_temp
+
+
+#####################################################################
+# FTH CASE
+#####################################################################
+dirname=${initprofile}_${runname}_stand_Tcst_limiter_Period_2
+runtype=0
+nPeriods=2
+nInterval=500
+
+# update input file
+cp Joe.in_template Joe.in_temp
+nSteps=$((10000*$nPeriods))
+perl -pi -e "s{INIT_PROFILE_TEMPLATE}{$initprofile}" Joe.in_temp
+perl -pi -e "s{CASE_TEMPLATE}{T_CST}" Joe.in_temp
+perl -pi -e "s{LIMITER_TEMPLATE}{GREENGAUSS LIMITER=YES  EPS=$limiter_eps}" Joe.in_temp
+perl -pi -e "s{SC_RECON_TEMPLATE}{STANDARD}" Joe.in_temp
+perl -pi -e "s{NSTEPS_TEMPLATE}{$nSteps}" Joe.in_temp
+perl -pi -e "s{INTERVAL_TEMPLATE}{$nInterval}" Joe.in_temp
+
+# run
+./scripts/run_order_accuracy $dirname $runtype
+
+# copy tecplot layout to visualize results
+cp ./layouts_tecplot/order_accuracy_cst_T.lay ./$dirname
+
+rm Joe.in_temp
+
+
+#####################################################################
+# SIXTH CASE
+#####################################################################
+dirname=${initprofile}_${runname}_stand_Tfixed_limiter_Period_2
+runtype=0
+nPeriods=2
+nInterval=500
+
+# update input file
+cp Joe.in_template Joe.in_temp
+nSteps=$((10000*$nPeriods))
+perl -pi -e "s{INIT_PROFILE_TEMPLATE}{$initprofile}" Joe.in_temp
+perl -pi -e "s{CASE_TEMPLATE}{T_FIXED}" Joe.in_temp
+perl -pi -e "s{LIMITER_TEMPLATE}{GREENGAUSS LIMITER=YES  EPS=$limiter_eps}" Joe.in_temp
+perl -pi -e "s{SC_RECON_TEMPLATE}{STANDARD}" Joe.in_temp
+perl -pi -e "s{NSTEPS_TEMPLATE}{$nSteps}" Joe.in_temp
+perl -pi -e "s{INTERVAL_TEMPLATE}{$nInterval}" Joe.in_temp
+
+# run
+./scripts/run_order_accuracy $dirname $runtype
+
+# copy tecplot layout to visualize results
+cp ./layouts_tecplot/order_accuracy_cst_T.lay ./$dirname
+
+rm Joe.in_temp
+
+exit 0

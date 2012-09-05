@@ -1,0 +1,46 @@
+# --------------------------------------
+# --------------------------------------
+# --------------------------------------
+#
+# Tommie Makefile.DAS.in
+#
+#
+
+ARCH = lnx86
+
+MPICH_DIR = ../mpich2
+SRC_DIR = ../src/
+ENABLE_MPI = 0
+
+MPICH_$(ARCH) = $(ARCH)
+MPICH_lnamd64 = lnx86_64
+
+ifeq ($(ENABLE_MPI),0)
+CFLAGS_MPICH = -DNO_MPI
+LD_FLAGS_MPICH =
+else
+CFLAGS_MPICH = -I$(MPICH_DIR)/$(MPICH_$(ARCH))/include
+LD_FLAGS_MPICH = -L$(MPICH_DIR)/$(MPICH_$(ARCH))/lib -lmpich -lpthread
+endif
+
+DEFS = -DDEBUG
+
+CC_lnx86 = g++
+CC_lnamd64 = $(CC_lnx86)
+CC_lnia64 = $(CC_lnx86)
+CC_ultra = CC
+
+#CFLAGS_lnx86 = -O3 -I. -Wall -Wno-deprecated -I$(SRC_DIR)
+CFLAGS_lnx86 = -O3 -I. -Wno-deprecated -I$(SRC_DIR)
+CFLAGS_lnamd64 = $(CFLAGS_lnx86) 
+CFLAGS_lnia64 = $(CFLAGS_lnx86)
+CFLAGS_ultra = -fast -xtarget=ultra3 -xmaxopt=5 -xarch=v8plusa -v -D__svr4__ -Dsparc -Dsun -Dunix -D__sparc -D_REENTRANT -D__EXTENSIONS__
+
+CC = $(CC_$(ARCH))
+CFLAGS = $(CFLAGS_$(ARCH)) $(CFLAGS_MPICH) $(DEFS)
+
+LD_FLAGS_lnamd64 = 
+LD_FLAGS_lnx86 = 
+
+LD_FLAGS = $(LD_FLAGS_$(ARCH)) $(LD_FLAGS_MPICH)
+

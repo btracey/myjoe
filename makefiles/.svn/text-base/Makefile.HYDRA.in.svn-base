@@ -1,0 +1,31 @@
+####---------------------------------------------------------------
+#### HYDRA -> SGI Origin 2000
+####---------------------------------------------------------------
+
+#
+# WITH_MPI
+#
+
+PARMETIS_INC = -I$(HOME)/ParMetis-3.1
+PARMETIS_LIB = -L$(HOME)/ParMetis-3.1 -lparmetis
+METIS_LIB = -lmetis
+
+HYPRE_INC = -I$(HOME)/hypre-2.0.0/src/hypre/include
+HYPRE_LIB = -L$(HOME)/hypre-2.0.0/src/hypre/lib -lHYPRE
+
+CC = CC
+
+###
+####----NO MPI
+#CFLAGS  = -D NO_MPI -64 -O3 -D FAST  -I.  -Wno-deprecated
+
+CFLAGS  = -D DEBUG -D WITH_PARMETIS -D WITH_HYPRE -64 -O3 -I. $(PARMETIS_INC) $(HYPRE_INC) -LANG:std -OPT:Olimit=0 -C
+CLD = -LANG:std -64
+CLIBS = $(PARMETIS_LIB) $(HYPRE_LIB) -lmpi -lmpi++ $(METIS_LIB)
+
+###
+####----MPI
+#CFLAGS  = -64 -O0 -D FAST  -I.  -LANG:std -OPT:Olimit=0 -C
+#CLD = -LANG:std -64 -lmpi -lmpi++
+#CLIBS = -lmpi -lmpi++
+

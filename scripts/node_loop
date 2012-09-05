@@ -1,0 +1,15 @@
+#!/bin/bash
+# Loop over all cluster nodes and perform command
+# Use: node_loop 'command'
+# Example: node_loop 'ps aux | grep terrapon'
+# Comment: not sure that the cluster bounds are 1..108 and 1..4
+
+for i in {1..108}
+do
+  for j in {1..4}
+  do
+    echo " "
+    echo compute-$i-$j
+    ssh compute-$i-$j -x "$1"
+  done
+done

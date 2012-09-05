@@ -1,0 +1,174 @@
+#LOGGING_LEVEL = DEBUG_HI            # show all linear solver residuals
+#LOGGING_LEVEL = INFO_LO             # show part of the linear solver residuals
+LOGGING_LEVEL = INFO                 # show standard output 
+
+
+##############################################################
+#     GAS PROPERTIES
+# --------------------------------------------------------- #
+
+######  BINARY MIXTURE  ########
+# Reference values for the two gases
+GAMMA_1 = 1.40
+GAMMA_2 = 1.30
+MOLMASS_1 = 2.016
+MOLMASS_2 = 28.9
+
+
+##############################################################
+#     INITIAL CONDITIONS
+# --------------------------------------------------------- #
+P_REF = 40000.0
+T_REF = 300.0
+RHO_REF = 0.001
+U_INITIAL = 1500.0 0.0 0.0
+
+MU_REF =  1.716e-5
+MU_MODE = SUTHERLAND
+SL_TREF = 273.15                      # Tref for Sutherland law	
+SL_SREF = 110.4                       # Sref for Sutherland law
+
+#T_REFERENCE = 300.0
+
+##############################################################
+#      SOLVER SETTINGS
+# --------------------------------------------------------- #
+
+# Mesh and restart file
+RESTART = ./mixinglayer_fine.msh
+
+#DT = 0.001                           # constant dt in the whole flow field 
+#CFL_MIN = 0.1                        # maximum time step corresponding to CFL_MIN, same dt for all cells 
+CFL = 4.0                            # constant CFL number in the whole flow field 
+CFL_RAMP AFTER_ITER=200  INTERVAL_ITER=100  FACTOR_CFL=1.2  MAX_CFL=10000.0 
+
+NSTEPS = 6000                         # number of time iterations 
+CHECK_INTERVAL = 10                   # interval print residuals
+WRITE_RESTART = 6000                 # write restart interval
+INITIAL_FLOWFIELD_OUTPUT = NO         # output initial flowfield (YES / NO)
+
+#RESID_ENERG_TH = 1.0e2  # stop criteria for iterations when energy residual is less then value
+
+#TIME_INTEGRATION = FORWARD_EULER              # explicit (forward) euler integration 
+#TIME_INTEGRATION = RK                         # runge kutta   
+#TIME_INTEGRATION = BACKWARD_EULER             # implicit (backward) euler
+TIME_INTEGRATION = BACKWARD_EULER_SEMICOUPLED     # implicit (backward) euler
+#TIME_INTEGRATION = BDF2                       # backward difference 2nd order (implict)
+
+LINEAR_SOLVER_NS = PETSC_GMRES 
+LINEAR_SOLVER_NS_TRESHOLDS  MAX_ITER=30  ABS_RESID=1.0e-8  REL_RESID=1.0e-2
+UNDER_RELAXATION = 0.4
+UNDER_RELAXATION_SCALARS = 0.4
+N_NEWTON_ITER = 4                     # number of Newton iterations for TIME_INTEGRATION = BDF2
+LINEAR_SOLVER_SCALARS = PETSC_GMRES   # or PETSC gmres
+
+##############################################################
+#     SPATIAL INTEGRATION 
+# ---------------------------------------------------------- #
+SPACE_INTEGRATION = HLLC       # HLLC, HAENEL, AUSMD, AUSMV, AUSMDV
+SHOCK_FIX_TYPE = HAENEL        # NONE, HAENEL, ALPHA_LR
+SHOCK_FIX_FLAG = CELL_FLAG_HEX # CELL_FLAG_HEX, CELL_FLAG_TET
+ENTROPY_FIX = EXPANSION_FAN    # NONE, EXPANSION_FAN
+
+SPATIAL_SECOND_ORDER           # comment out for first order
+GRAD_RECONSTRUCTION = SCHEME=GREENGAUSS LIMITER=YES EPS=0.01
+#GRAD_RECONSTRUCTION = SCHEME=LEASTSQUARES LIMITER=YES EPS=0.01
+
+SCALAR_RECONSTRUCTION = CONSERVATIVE
+
+
+###############################################################
+#     COMBUSTION - MIXING
+# ----------------------------------------------------------- #
+
+# File where thermo properties for each species are saved
+THERMO_INPUT_FILE = ../batesgri.thermo.bin
+
+# Species (left=oxidizer, right=fuel; BCs given as mass fraction)
+NUMBER_SPECIES = 3
+SPECIES = N2 O2 H2
+MIXING_BC_LEFT = 0.767 0.233 0.0
+MIXING_BC_RIGHT = 0.0 0.0 1.0
+# Species used to ensure sum of all species to be 1
+DOM_SPECIES = N2
+
+# Schmidt number for the scalars ZMean, ZVar and CMean and Prandtl number
+SCTURB_ZMean = 0.5
+PRTURB = 0.5
+
+# BCs for the scalars ZMean, ZVar and CMean
+upperInlet.ZMean = 0.0
+lowerInlet.ZMean = 1.0
+upperSide.ZMean  = 0.0
+lowerSide.ZMean  = 1.0
+outlet.ZMean     = 0.0
+
+
+#################################
+#     BOUNDARY CONDITIONS
+# -------------------------------
+
+# ---- for Navier-Stokes  --------------------------------------------------------------------------
+# boundary_name = HOOK                                  # provide velocity, temperature and pressure
+# boundary_name = CBC ux uy uz temperature pressure
+# boundary_name = CBC_SUBSONIC_INLET ux/vel uy/vel uz/vel Ttot ptot
+# boundary_name = CBC_SUBSONIC_OUTLET pstat
+# boundary_name = SYMMETRY                              # slip BC
+# boundary_name = NEUMANN                               # van Neumann BC
+# boundary_name = WALL                                  # no slip BC with adiabatic wall
+# boundary_name = WALL TEMP=temperature                 # no slip BC with isothermal wall
+
+# ---- for scalars ---------------------------------------------------------------------------------
+# boundary_name.scalar_name = value       # Dirichlet 
+# boundary_name.scalar_name = HOOK        # HOOK 
+# if no boundary condition is set for scalars: von Neumann BC is applied 
+
+
+upperinlet = CBC 1800.0 0.0 0.0 1550.0 40000.0
+lowerinlet = CBC 1500.0 0.0 0.0  300.0 40000.0
+upperside  = NEUMANN
+lowerside  = NEUMANN
+outlet     = NEUMANN
+wall       = WALL TEMP = 300.0
+symm       = SYMMETRY
+
+SYMM_BC = ANALYTICAL            # ORIGINAL_NUMERIC, NEW_NUMERIC, ANALYTICAL
+
+# -------------------------------
+# SA SA SA SA SA SA SA SA SA SA SA   
+# -------------------------------
+upperinlet.nuSA = 0.00001
+lowerinlet.nuSA = 0.00001
+upperside.nuSA  = 0.00001 
+lowerside.nuSA  = 0.00001 
+outlet.nuSA     = 0.00001
+wall.nuSA       = 0.0
+
+# -------------------------------
+# KOM models
+# -------------------------------
+INITIAL_CONDITION_TURB = 5.0 900.0
+
+SST_LIMIT_PK = 1
+SST_LIMITER_SHEARSTRESS = 1
+
+upperinlet.kine = 5.0
+lowerinlet.kine = 5.0
+upperside.kine  = 5.0
+lowerside.kine  = 5.0
+outlet.kine     = 5.0
+wall.kine       = 0.0
+
+upperinlet.omega = 900.0
+lowerinlet.omega = 900.0
+upperside.omega  = 900.0
+lowerside.omega  = 900.0
+outlet.omega     = 900.0
+wall.omega       = HOOK
+
+
+#################################
+#      OUTPUT SETTINGS 
+# -------------------------------
+
+WRITE_DATA FORMAT=TECPLOT NAME=fluid INTERVAL = 6000 GEOM=ALL VARS= RHO vel RHOE press temp enthalpy gamma muLam muT kine omega RoM ZMean residField 

@@ -1,0 +1,69 @@
+###########################################
+#   PARAMETERS to study their influence 
+# -----------------------------
+
+DO_NOT_SOLVE_NS ## solve only transport equations and turn off NS
+SHOCK_THICKNESS = 0.1
+
+# for SST 
+a1 = 10.3e6
+SST_LIMIT_PK = 0
+SST_LIMITER_SHEARSTRESS = 0
+
+# for wilcox
+KOM_RealizableConstraint = 1 # for wilcox 
+cLim = 0.88
+
+
+################################
+#     GAS PROPERTIES
+# -----------------------------
+RHO_REF = 3.5
+P_REF = 5.0e5
+T_REF = 500.0
+U_INITIAL = 0.0 0.0 0.0 
+MU_REF = 0.0
+GAMMA = 1.4
+
+#RESTART = restart.in
+RESTART = ./box.msh
+
+################################
+#      SOLVER SETTINGS
+# -----------------------------
+CFL = 5.0
+NSTEPS = 2000
+CHECK_INTERVAL = 200
+WRITE_RESTART = 10000
+TIME_INTEGRATION = FORWARD_EULER
+
+SPATIAL_SECOND_ORDER
+GRAD_RECONSTRUCTION  SCHEME=GREENGAUSS  LIMITER=YES  EPS=0.01
+
+#################################
+# BOUNDARY CONSITIONS
+# -----------------------------
+inlet = NEUMANN
+outlet = NEUMANN
+symm = SYMMETRY
+
+#################################
+# BC condition for turbulence 
+# -----------------------------
+DO_NOT_CALC_WALLDIST
+INITIAL_CONDITION_TURB = 9.8e-3 1.3e-3
+#INITIAL_CONDITION_TURB = 9.8e-3 1.4739229 
+
+
+inlet.kine = 9.8e-3
+outlet.kine = 1.0
+
+inlet.eps = 1.3e-3
+outlet.eps = 1.0
+
+inlet.omega = 1.4739229
+outlet.omega = 1.4739229
+
+WRITE_DATA FORMAT=TECPLOT NAME=fluid INTERVAL=2000 GEOM=ALL VARS= RHO RHOU RHOE press temp kine eps strMag diverg muT
+
+

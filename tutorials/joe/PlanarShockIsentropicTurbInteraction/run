@@ -1,0 +1,21 @@
+#!/bin/bash
+
+### these are the specified shock thicknesses for the hyperbolic tangent 
+name=( 0.01 0.02 0.04 0.08 0.16 0.32 0.64 )
+
+## change run number for different models (2...SST, 3...Wilcox)
+run=3
+
+rm fluid*
+
+### run the cases
+for i in "${name[@]}" ; do 
+  echo running $i
+  sed "/SHOCK_THICKNESS/ s/0.1/$i/" Joe.in > Joe.$i.in
+  mpirun -np 2 ./joe $run Joe.$i.in
+  rm Joe.$i.in
+  mv fluid.002000.plt fluid.$i.dat
+done
+
+
+

@@ -1,0 +1,71 @@
+#############################################################
+#     GAS PROPERTIES
+RHO_REF = 1.4
+P_REF = 1.0
+T_REF = 1.0
+U_INITIAL = 0.296 0.0 0.0
+MU_MODE = POWERLAW # 
+MU_POWER_LAW = 0.0 # to ensure constant MULAM
+MU_REF = 5.0e-7
+GAMMA = 1.4
+
+RESTART = restart.in
+
+#############################################################
+#      SOLVER SETTINGS
+NSTEPS = 500
+CHECK_INTERVAL = 2
+WRITE_RESTART = 500
+
+CFL = 100.0
+RAMP_CFL = 100 100 1.25 200.0
+
+SPATIAL_SECOND_ORDER
+GRAD_RECONSTRUCTION = GREENGAUSS MINMOD
+
+TIME_INTEGRATION = IMPL_EULER
+LINEAR_SOLVER_NS = PETSC_GMRES
+#LINEAR_SOLVER_NS = BCGSTAB
+
+UNDER_RELAXATION = 0.5
+LIN_SOLVER_ZERO_ABS_REL = 1.0e-8 1.0e-2
+N_NEWTON_ITER = 1
+
+#############################################################
+# BOUNDARY CONSITIONS
+inlet =  CBC_SUBSONIC_INLET  1.0 0.0 0.0 1.0 2.5 1.0
+outlet = CBC_SUBSONIC_OUTLET 0.94
+wall = WALL #TEMP = 2.0
+symm = SYMMETRY
+
+#############################################################
+INIT_NU_SA = 1.0e-6
+RELAX_SA = 0.6
+
+inlet.nuSA = 1.0e-6    # nuSA/nuLam ~ 1.0
+wall.nuSA = 0.0
+outlet.nuSA = 1.0e-6
+
+#############################################################
+# komega models
+INITIAL_CONDITION_TURB = 1.35e-5 10.0
+
+RELAX_kine = 0.6
+RELAX_omega = 0.4
+
+SST_LIMIT_PK = 1
+SST_LIMITER_SHEARSTRESS = 0
+
+inlet.kine = 1.35e-5 # ~ 1.0% turbulence intensity at the inlet
+inlet.omega = 10.0   # ~ mut/mul ~ 4
+wall.kine = 0.0
+wall.omega = HOOK
+outlet.kine = 1.35e-5
+outlet.omega = 10.0
+
+
+#############################################################
+# output 
+WRITE_DATA FORMAT=TECPLOT NAME=fluid INTERVAL=200 GEOM=ALL VARS= RHO RHOU RHOE temp press muT kine omega nuSA
+
+

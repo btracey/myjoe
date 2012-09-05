@@ -1,0 +1,215 @@
+K 25
+svn:wc:ra_dav:version-url
+V 39
+/repos/MUM/!svn/ver/466/trunk/makefiles
+END
+Makefile.ALC.in
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.ALC.in
+END
+Makefile.CERTAINTY.in
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/repos/MUM/!svn/ver/451/trunk/makefiles/Makefile.CERTAINTY.in
+END
+Makefile.JHF_INTEL.in
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/repos/MUM/!svn/ver/450/trunk/makefiles/Makefile.JHF_INTEL.in
+END
+Makefile.WW_MPI.in
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/repos/MUM/!svn/ver/125/trunk/makefiles/Makefile.WW_MPI.in
+END
+Makefile.VINCE.in
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/repos/MUM/!svn/ver/140/trunk/makefiles/Makefile.VINCE.in
+END
+Makefile.PINO_NOMPI.in
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.PINO_NOMPI.in
+END
+Makefile.HYDRA.in
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.HYDRA.in
+END
+Makefile.OSX.in
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/repos/MUM/!svn/ver/331/trunk/makefiles/Makefile.OSX.in
+END
+Makefile.VINCE_NOMPI_DEBUG.in
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/repos/MUM/!svn/ver/336/trunk/makefiles/Makefile.VINCE_NOMPI_DEBUG.in
+END
+Makefile.VINCE_GNU.in
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/repos/MUM/!svn/ver/466/trunk/makefiles/Makefile.VINCE_GNU.in
+END
+Makefile.HERA_PETSC.in
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/repos/MUM/!svn/ver/270/trunk/makefiles/Makefile.HERA_PETSC.in
+END
+Makefile.HERA.in
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.HERA.in
+END
+Makefile.HYDRA_NOHYPRE_DEBUG.in
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.HYDRA_NOHYPRE_DEBUG.in
+END
+Makefile.CALVING.in
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.CALVING.in
+END
+Makefile.CASCADE.in
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.CASCADE.in
+END
+Makefile.UP.in
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.UP.in
+END
+Makefile.WCR_INTEL_NOMPI.in
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.WCR_INTEL_NOMPI.in
+END
+Makefile.RENE.in
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/repos/MUM/!svn/ver/171/trunk/makefiles/Makefile.RENE.in
+END
+Makefile.LOBO.in
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/repos/MUM/!svn/ver/123/trunk/makefiles/Makefile.LOBO.in
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/repos/MUM/!svn/ver/461/trunk/makefiles/Makefile
+END
+Makefile.LINUX_DEBUG.in
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.LINUX_DEBUG.in
+END
+Makefile.DAS.in
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.DAS.in
+END
+Makefile.HYDRA_NOMPI.in
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.HYDRA_NOMPI.in
+END
+Makefile.HYDRA_NOHYPRE.in
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.HYDRA_NOHYPRE.in
+END
+Makefile.SORRENTO.in
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.SORRENTO.in
+END
+Makefile.HYDRA_DEBUG.in
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.HYDRA_DEBUG.in
+END
+Makefile.OSX_DEBUG.in
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/repos/MUM/!svn/ver/331/trunk/makefiles/Makefile.OSX_DEBUG.in
+END
+Makefile.CASCADE_NOMPI.in
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.CASCADE_NOMPI.in
+END
+Makefile.WCR_INTEL.in
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.WCR_INTEL.in
+END
+Makefile.ABE.in
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.ABE.in
+END
+Makefile.NIVATION.in
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.NIVATION.in
+END
+Makefile.JHF_INTEL_OPENMPI.in
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.JHF_INTEL_OPENMPI.in
+END
+Makefile.JHF_INTEL_UD.in
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.JHF_INTEL_UD.in
+END
+Makefile.RENE_NOMPI.in
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.RENE_NOMPI.in
+END
+Makefile.WW.in
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/repos/MUM/!svn/ver/3/trunk/makefiles/Makefile.WW.in
+END

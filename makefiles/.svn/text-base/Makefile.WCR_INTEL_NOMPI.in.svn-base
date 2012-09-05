@@ -1,0 +1,21 @@
+# --------------------------------------
+# --------------------------------------
+# --------------------------------------
+#
+# Makefile.WCR_INTEL.in
+#
+
+#PARMETIS_INC = -I/opt/parmetis/intel/mvapich/include
+# temporary hack until steve gets include in /opt/etc...
+#PARMETIS_INC = -I$(HOME)/parmetis_include
+#PARMETIS_LIB = -L/opt/parmetis/intel/lib -lparmetis
+#METIS_LIB = -L/opt/parmetis/intel/lib -lmetis
+
+#HYPRE_INC = -I/opt/hypre-2.0.0/intel/include 
+#HYPRE_LIB = -L/opt/hypre-2.0.0/intel/lib -lHYPRE
+
+#CC = /share/apps/mvapich/intel/bin/mpicxx
+CC = icpc
+CFLAGS = -O3 -I. -Wno-deprecated -I. -DNO_ASSERT -DNO_MPI
+CLIBS = 
+

@@ -1,0 +1,77 @@
+#################################################
+### Shock tube input file
+#################################################
+
+DT = 0.004
+NSTEPS = 30
+#DT = 0.002
+#NSTEPS = 60
+#CFL_MIN = 1.0
+#WRITE_DATA FORMAT=TECPLOT NAME=fluid INTERVAL=40 GEOM=ALL VARS= RHO RHOU RHOE press temp phi
+
+CHECK_INTERVAL = 1
+RESTART = ./Expansion100.msh
+#RESTART = ./Expansion200.msh
+
+#################################
+# --- GAS PROPERTIES
+RHO_REF = 1.4
+P_REF = 1.0
+T_REF = 1.0
+GAMMA = 1.4
+
+#################################
+# --- INITIAL CONDITIONS
+# Strong expansion fan
+P_L   = 2.0
+RHO_L = 1.4
+U_L   = -3.535533906
+P_R   = 0.5
+RHO_R = 1.4
+U_R   = 3.535533906
+
+# Sod problem
+#P_L   = 1.0
+#RHO_L = 1.0
+#U_L   = 0.0
+#P_R   = 0.1
+#RHO_R = 0.125
+#U_R   = 0.0
+
+PHI_L = 1.0
+PHI_R = 0.5
+
+#################################
+# --- SPATIAL INTEGRATION 
+SPACE_INTEGRATION = HAENEL          # HLLC, HAENEL, AUSMD, AUSMV, AUSMDV
+SHOCK_FIX_TYPE = HAENEL             # NONE, HAENEL, ALPHA_LR
+SHOCK_FIX_FLAG = CELL_FLAG_HEX      # CELL_FLAG_HEX, CELL_FLAG_TET
+ENTROPY_FIX = EXPANSION_FAN         # NONE, EXPANSION_FAN
+SPATIAL_SECOND_ORDER
+GRAD_RECONSTRUCTION = SCHEME=GREENGAUSS LIMITER=YES EPS=0.001
+#GRAD_RECONSTRUCION = SCHEME=LEASTSQUARES LIMITER=YES EPS=0.0001
+
+#################################
+# --- TIME INTEGRATION
+#TIME_INTEGRATION = FORWARD_EULER
+TIME_INTEGRATION = RK
+#TIME_INTEGRATION = BACKWARD_EULER
+#TIME_INTEGRATION = BDF2
+
+LINEAR_SOLVER_NS = PETSC_GMRES
+LINEAR_SOLVER_NS_TRESHOLDS: MAX_ITER=30  ABS_RESID=1.0e-8  REL_RESID=1.0e-2
+
+
+#################################
+# --- BOUNDARY CONDITIONS
+in  = NEUMANN
+out = NEUMANN
+
+y0 = SYMMETRY
+y1 = SYMMETRY
+z0 = SYMMETRY
+z1 = SYMMETRY
+
+
+
+

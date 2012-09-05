@@ -1,0 +1,25 @@
+####---------------------------------------------------------------
+#### Makefile.in 
+####---------------------------------------------------------------
+
+PARMETIS_INC = -I/usr/local/ParMetis-4.0.2/include
+PARMETIS_LIB = -L/usr/local/Parmetis-4.0.2/lib -lparmetis
+
+METIS_INC = -I/usr/local/metis/include
+METIS_LIB = -L/usr/local/metis/lib -lmetis
+
+PETSC_DIR = /usr/local/petsc-3.1-p8
+PETSC_ARCH = petsc-for-joe
+include ${PETSC_DIR}/conf/variables
+
+CC = mpicxx
+F90 = gfortran
+Fin = ifort
+
+WITH_FORTRAN = WITH_FORTRAN
+
+CFLAGS = -D DEBUG -D NO_ASSERT -D WITH_PARMETIS -D WITH_PETSC -g -I. $(PARMETIS_INC) $(PETSC_INCLUDE) $(METIS_INC)
+
+CLD = -g
+CLIBS = $(PARMETIS_LIB) $(PETSC_LIB) $(METIS_LIB)
+

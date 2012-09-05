@@ -1,0 +1,21 @@
+
+# LANL's lobo
+
+PETSC_DIR = ${HOME}/Libraries/petsc-3.0.0-p8
+#PETSC_ARCH = linux-gnu-c-opt
+PETSC_ARCH = openmpi1.2.8-c-opt
+#PETSC_ARCH = linux-gnu-c-debug
+include ${PETSC_DIR}/conf/variables
+
+#PARMETIS_INC = -I$(HOME)/Libraries/ParMetis-3.1.1
+#PARMETIS_LIB = -L$(HOME)/Libraries/ParMetis-3.1.1 -lparmetis
+PARMETIS_INC = -I$(HOME)/Libraries/ParMetis-3.1.1_openmpi
+PARMETIS_LIB = -L$(HOME)/Libraries/ParMetis-3.1.1_openmpi -lparmetis
+METIS_LIB = -lmetis
+
+CC = mpicxx
+CFLAGS = -O3 -no-prec-div -DWITH_PARMETIS -DNO_ASSERT -DWITH_PETSC -I. $(PARMETIS_INC) $(PETSC_INCLUDE)
+CLIBS = $(PARMETIS_LIB) $(MPI_LIBS) $(METIS_LIB) $(PETSC_LIB)
+
+LAPACK_LIB = -llapack
+

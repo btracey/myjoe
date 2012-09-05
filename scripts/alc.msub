@@ -1,0 +1,50 @@
+#!/bin/bash
+
+##### MSUB stuff
+#MSUB -l nodes=256
+#MSUB -l walltime=00:12:00:00 # dd:hh:mm:ss
+#MSUB -d /g/g92/feham/runs_alc/arn2
+
+#MSUB -m be
+#MSUB -j oe
+
+#MSUB -l partition=alc
+
+#MSUB -A stanford
+
+##### DAT-specific options
+##MSUB -A stanfdat
+##MSUB -l qos=expedite
+
+##### run the job
+echo Job ID: $SLURM_JOBID
+echo Start time: `date`
+echo
+
+srun -n 512 ./deegee
+
+#OUTFILE=slurm-${SLURM_JOBID}.out
+#STEPS=`grep "> int value: STEP:" $OUTFILE | cut -d\> -f2 | cut -d: -f3`
+#STEPS=`echo $STEPS`
+#NNNNNN=NNNNNN
+#case ${#STEPS} in
+#   1 ) NNNNNN=00000$STEPS;;
+#   2 ) NNNNNN=0000$STEPS;;
+#   3 ) NNNNNN=000$STEPS;;
+#   4 ) NNNNNN=00$STEPS;;
+#   5 ) NNNNNN=0$STEPS;;
+#   6 ) NNNNNN=$STEPS;;
+#esac
+#if [ -e restart.out ]
+#then
+#   mv restart.out restart.${NNNNNN}
+#   ln -sf restart.${NNNNNN} restart.in
+#   echo
+#   echo Moved  restart file to: restart.${NNNNNN}
+#   echo Linked restart file to: restart.in
+#else 
+#   echo
+#   echo Error renaming file: \"restart.out\" not found.
+#fi
+
+echo End time: `date`

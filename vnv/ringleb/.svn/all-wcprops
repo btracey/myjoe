@@ -1,0 +1,65 @@
+K 25
+svn:wc:ra_dav:version-url
+V 41
+/repos/MUM/!svn/ver/378/trunk/vnv/ringleb
+END
+run
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/repos/MUM/!svn/ver/378/trunk/vnv/ringleb/run
+END
+Ringleb_1.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/repos/MUM/!svn/ver/67/trunk/vnv/ringleb/Ringleb_1.tar.gz
+END
+Ringleb_2.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/repos/MUM/!svn/ver/67/trunk/vnv/ringleb/Ringleb_2.tar.gz
+END
+Ringleb_3.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/repos/MUM/!svn/ver/67/trunk/vnv/ringleb/Ringleb_3.tar.gz
+END
+Ringleb_4.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/repos/MUM/!svn/ver/67/trunk/vnv/ringleb/Ringleb_4.tar.gz
+END
+Ringleb_5.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/repos/MUM/!svn/ver/67/trunk/vnv/ringleb/Ringleb_5.tar.gz
+END
+README
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/repos/MUM/!svn/ver/75/trunk/vnv/ringleb/README
+END
+gnuplotscript
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/repos/MUM/!svn/ver/67/trunk/vnv/ringleb/gnuplotscript
+END
+JoeTemplate.in
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/repos/MUM/!svn/ver/378/trunk/vnv/ringleb/JoeTemplate.in
+END
+joe.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/repos/MUM/!svn/ver/378/trunk/vnv/ringleb/joe.cpp
+END

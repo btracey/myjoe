@@ -1,0 +1,14 @@
+# --------------------------------------
+# --------------------------------------
+# --------------------------------------
+#
+# Tommie Makefile.WW.in
+# wavywall, nompi
+#
+#
+
+CC = g++
+#CFLAGS = -O3 -I. -Wno-deprecated -I. -DNO_MPI -DMPI_OFFSET_IS_LONG_LONG_INT -DNO_ASSERT 
+CFLAGS = -O0 -g -I. -Wno-deprecated -I. -DNO_MPI -DMPI_OFFSET_IS_LONG_LONG_INT -DNO_ASSERT -DDEBUG -m64
+CLD = -m64
+

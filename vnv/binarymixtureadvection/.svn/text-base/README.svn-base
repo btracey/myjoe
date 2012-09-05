@@ -1,0 +1,183 @@
+
+*************************************************************************
+*************************************************************************
+**                                                                     **
+**                 V&V: ADVECTION OF A BINARY MIXTURE                  **
+**                                                                     ** 
+*************************************************************************
+*************************************************************************
+
+************
+INTRODUCTION
+************
+
+This V&V case is intended to verify the advection of a mixture in a 1D
+periodic box. The solution is initialized with two gases separated by a
+smooth interface at a constant pressure. The initialize solution is then 
+convected with a constant velocity. 
+
+A set of refined grids is used to check the order of accuracy. A Runge-
+Kutta time advancement is used. The time step in Joe.in ensures that
+all runs should be stable on the finest grid for the pre-selected 
+convection speed.
+
+3 different cases are considered:
+* constant temperature at t=0
+* constant density at t=0
+* prescribed fuel and oxidizer temperature at t=0
+
+2 different initial mixture profiles can be used:
+* smoothed hat function
+* sine
+
+3 different types of thermodynamics can be used:
+* linear mixing
+* linear mixing with temperature dependence for specific heat coefficients
+* single analytical flamelet (to represent combustion)
+
+Since it is a pure advection problem (no diffusion), the initial solution
+should simply be convected over time.
+
+Scripts and tecplot layouts are provided to automatize the work (see
+"USAGE" section)
+
+
+*******
+OPTIONS
+*******
+
+* 3 different types of mixture can be used:
+  - BinaryMixture: simple linear mixing rule (i.e., cp, R,... depend only
+                   on the mixture fraction Z, not on temperature)
+                   gamma and the molar fraction of the 2 gases must be
+                   given in Joe.in
+                   to use this option, run: './joe 0'
+                   set NON_LIN_MIX_D_CP=0.0 and NON_LIN_MIX_D_R=0.0
+
+  - Analytical flamelet: single flamelet with analytical expression to
+                         simulate a flame (depends only on Z)
+                         to use this option, run './joe 0'
+                         set NON_LIN_MIX_D_CP=900.0 and NON_LIN_MIX_D_R=60.0
+                         or other appropriate value
+
+
+  - Mixing: linear mixing rule with temperature dependency (i.e., cp, R,
+            ... depend on mixture fraction Z and temperature T)
+            a thermo input file (e.g., batesgri.thermo.bin) and the 
+            composition of the gases must be given in Joe.in
+            to use this option, run: './joe 1'
+
+
+* 3 different cases:
+  - constant initial temperature: temperature, pressure, velocity and 
+                                  mixture fraction are used to initia-
+                                  lize the solution
+                                  temperature, pressure and velocity
+                                  should remain constant over time
+                                  use CASE = T_CST in Joe.in
+
+  - constant initial density: density, pressure, velocity and mixture
+                              fraction are used to initialize the 
+                              solution
+                              density, pressure and velocity should
+                              remain constant over time
+                              use CASE = RHO_CST in Joe.in
+
+  - prescribed fuel and oxidizer temperature: Tfuel and TOxy are prescribed,
+                                              pressure is constant
+                                              use CASE = T_FIXED and set
+                                              T_FUEL and T_OXY
+
+
+* 2 different types of reconstruction of scalars at faces (for 2nd order):
+  - standard reconstruction: scalars phi are reconstructed using gradients
+                             of phi: phi_fa = phi_icv + grad phi * r
+                             use SCALAR_RECONSTRUCTION = STANDARD in Joe.in
+
+  - conservative reconstruction: scalars phi are reconstruction using 
+                                 gradients of rhophi:
+                                 phi_fa = (rhophi_icv + grad rhophi * r) / rho_fa
+                                 use SCALAR_RECONSTRUCTION = CONSERVATIVE in Joe.in
+
+
+* 2 different types of limiters:
+  - no limiters: no limiters are used
+                 use GRAD_RECONSTRUCTION = GREENGAUSS NOLIMITER
+
+  - modified Barth/Jesperson limiter: limiters are used
+                                      use GRAD_RECONSTRUCTION = GREENGAUSS MINMOD
+
+
+* 2 different mixture fraction profiles:
+  - hat function: hat function smoothed around the discontinuities
+                  use INIT_PROFILE = SMOOTH_HAT
+
+  - sine function: smooth cosine function
+                   use INIT_PROFILE = SINE
+
+
+*****
+USAGE
+*****
+
+* first:
+  - copy sample $MUM_HOME/makefiles/Makefile into current directory
+  - make clean
+  - make joe
+
+* simple case:
+  to run a simple case, 
+  - modify Joe.in for your specific conditions using the standard parameters and 
+    the parameters mentioned above
+  - run './joe 0' or './joe 1'
+
+* movie:
+  to create a set of .png files that can be animated (e.g., with blockbuster,
+  animate, or others),
+  - create a new directory
+  - copy 'Joe.in' into directory and modify it (e.g., paths to files)
+  - copy 'layouts_tecplot/movie.XXXXXX.lay' into directory
+  - copy 'scripts/png.mcr' and 'scripts/mypng_overall' into directory
+  - run joe '../joe 0' or '../joe 1'
+  - modify layout 'movie.XXXXXX.lay' (i.e., replace XXXXXX with specific 
+    file number) to check that everything is fine
+  - modify back layout 'movie.XXXXXX.lay'
+  - run './mypng_overall $1 $2 $3' where 
+    $1: number of first output file (e.g., 0)
+    $2: number of last output file  (e.g., 100000)
+    $3: interval between 2 consecutive files (e.g., 500)
+
+* order of accuracy check:
+  to analyze and visualize the order of accuracy (convergence) of the code in
+  the case of convected binary mixture,
+  - edit script 'run_all' (e.g., directory name, case parameters, ...)
+  - run './run_all'
+
+  this will create for each case considered a new directory which will contain
+  many directories for the solution of the case on each different grid; the
+  output file 'error.dat' contains the different errors (L1, L2 and Linf) for
+  different variables; a layout file is also copied into the directory so
+  that you can look at the solution directly.
+
+
+*******
+CONTENT
+*******
+
+* joe.cpp: main file containing the case setup
+
+* run_all: script to run convergence analysis (to be customized)
+
+* Joe.in: sample input file
+
+* Joe.in_template: template input file used for automation
+
+* batesgri.thermo.bin: thermo data file for Mixing case 
+
+* grids: directory containing the different grids
+
+* scripts: directory containing the different scripts
+
+* layouts_tecplot: directory containing the different tecplot layouts
+
+* error_dat_template: template output file for error.dat

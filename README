@@ -1,0 +1,69 @@
+WELCOME TO MUM!
+
+Introduction
+************
+
+MUM consists of a suite of tools for compressible flows on unstructured mesh and contains following tools:
+* joe:      RANS and URANS solver
+* ray:      manager for UQ computations
+* charles:  LES solver
+
+Structure
+*********
+The main directory xxx/mum/ contains a general makefile "Makefile" to build the package. Different 
+predefined input makefiles are available in the makefiles directory (see Installation for more details).
+Following directories are also present:
+* bin:        containing the executables
+* docs:       containing documentation
+* makefiles:  containing sample input makefiles for different architectures and the case makefile
+* src:        containing the src files for the package
+* tutorials:  containing different cases ready to be used
+
+The src directory is itself structured into 5 directories:
+* common: containing the common source files for all solvers
+* joe: containing the source files specific to the URANS solver joe
+* ray: containing the source files specific to the UQ manager ray
+* charles: containing the source files specific to the LES solver charles
+* tools: containing the source files specific to pre- and postprocessing
+Each source directory also contains a makefile "Makefile" to compile the specific source files
+and a Makefile.dep to define explicitly the dependencies of all included files file.h. If you
+have to change the main code, don't forget to update the dependencies of your new/updated
+files in the corresponding makefiles (Makefile and Makefile.dep). 
+
+Installation
+************
+
+* Download package from repository
+  > svn co http://bigbird.stanford.edu/repos/MUM/trunk mum
+  > svn update
+
+* Customize the package to your own architecture and directories
+  Define the variabale MUM_HOME as the main directory where you installed the package
+  (it might be useful to put the variable setting into your .bashrc or similar file), e.g.:
+  > export MUM_HOME=$HOME/Codes/mum
+
+  Copy/adapt compilation option input makefile "Makefile.in"
+  > cd $MUM_HOME
+  > cp makefiles/Makefile.XXX.in Makefile.in
+  where Makefile.XXX.in corresponds to your architecture; if no input makefile is available for your
+  architecture, use the closest one and adapt it.
+
+* Compilation of entire package:
+  > make all
+  Comment: typing make help will give you different build options, if you don't want to install the 
+           entire package.
+
+* Compilation of cases
+  Users can adapt the solvers for their own use (e.g., user specific boundary conditions). For instance,
+  joe users can define their own functions in joe.cpp. If you don't want to use the original/vanilla version 
+  of the code, you can compile your own version in your case directory <case_dir>. If you provide your own 
+  joe.cpp it will be compiled instead of the vanilla version; if joe.cpp is not provided, the original joe.cpp
+  will be used.
+  > cd $MUM_HOME/makefiles
+  > cp Makefile <case_dir>
+  > cd <case_dir>
+  > make <xxx>
+  where <xxx> can be joe, ray or charles. This will create an executable <xxx> in your case directory using 
+  your own joe.cpp (if provided).
+  If you need to add additional files (file.h or file.cpp), don't forget to add them and their respective 
+  dependencies in the Makefile you have copied in your case directory.

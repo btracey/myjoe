@@ -1,0 +1,28 @@
+####---------------------------------------------------------------
+#### VINCENT's linux workstation
+####---------------------------------------------------------------
+
+PETSC_DIR = /opt/petsc-3.1-p8
+PETSC_ARCH = linux-gnu-opt
+include ${PETSC_DIR}/conf/variables
+
+PARMETIS_INC = -I/opt/ParMetis-3.2.0
+PARMETIS_LIB = -L/opt/ParMetis-3.2.0 -lparmetis
+METIS_LIB = -lmetis
+
+MPI_INC = -I/opt/mpich2-1.3.2p1_gnu/include
+MPI_LIB = -L/opt/ParMetis-3.2.0/lib
+
+LAPACK_LIB = -lblas -llapack
+
+CC = /opt/mpich2-1.3.2p1_gnu/bin/mpic++
+F90 = /opt/mpich2-1.3.2p1_gnu/bin/mpif90
+
+CFLAGS = -DNO_ASSERT -DMPI_OFFSET_IS_LONG_LONG_INT -DWITH_PARMETIS -DWITH_PETSC -O3 -I. $(PARMETIS_INC) $(MPI_INC) $(LAPACK_LIB) $(PETSC_INCLUDE)
+#CFLAGS = -DNO_ASSERT -DWITH_PARMETIS -DWITH_PETSC -O3 -I. $(PARMETIS_INC) $(MPI_INC) $(PETSC_INCLUDE)
+ 
+#CLD = -g  #-LANG:std -64
+CLIBS = $(PARMETIS_LIB) $(MPI_LIB) $(METIS_LIB) $(HYPRE_LIB) $(PETSC_LIB) $(LAPACK_LIB) 
+
+
+

@@ -1,0 +1,68 @@
+################################
+#     GAS PROPERTIES
+# -----------------------------
+#TRANSFORM_MESH
+SCALE_BL = 1.0
+SCALE_MESH_X = 1.0
+SCALE_MESH_Y = 1.0
+
+RHO_REF = 0.11565
+P_REF = 3900.70
+T_REF = 117.5
+U_INITIAL = 597.6 0.0 0.0
+MU_MODE = SUTHERLAND
+MU_REF = 1.716e-5
+GAMMA = 1.4
+
+#RESTART = ./UM_flat_plate_v2_m.cas
+RESTART = ./restart.out
+
+################################
+#      SOLVER SETTINGS
+# -----------------------------
+
+NSTEPS = 0
+CHECK_INTERVAL = 10
+WRITE_RESTART = 1000
+
+TIME_INTEGRATION = IMPL_EULER
+
+LINEAR_SOLVER_NS = PETSC_GMRES 
+#LINEAR_SOLVER_NS = BCGSTAB
+UNDER_RELAXATION = 0.4
+LIN_SOLVER_ZERO_ABS_REL = 1.0e-8 1.0e-2
+N_NEWTON_ITER = 1
+
+SPATIAL_SECOND_ORDER
+GRAD_RECONSTRUCTION = GREENGAUSS MINMOD 
+
+#DT = 0.002
+CFL =  5.0
+RAMP_CFL = 100 100 1.25 100.0
+
+#################################
+# BOUNDARY CONDITIONS
+
+Inlet-5 = HOOK
+Outlet-7 = NEUMANN 
+Wall_Viscid-8 = WALL #TEMP = 307.0
+Outlet_Top-4 = NEUMANN
+Symmetry-6 = SYMMETRY
+
+RELAX_kine = 0.4
+RELAX_omega = 0.4
+
+INITIAL_CONDITION_TURB = 0.5357 220.250
+Inlet-5.kine = 0.5357
+Outlet-7.kine = 0.5357
+Wall_Viscid-8.kine = 0.0
+Outlet_Top-4.kine = 0.5357
+
+Inlet-5.omega = 220.250
+Outlet-7.omega = 220.250
+Outlet_Top-4.omega = 220.250
+Wall_Viscid-8.omega = HOOK
+
+WRITE_DATA FORMAT=TECPLOT NAME=fluid  INTERVAL= 5000 GEOM=ALL VARS= RHO vel RHOE press temp kine omega muT muLam  residField
+
+

@@ -1,0 +1,39 @@
+#!/bin/bash
+
+##### MSUB stuff
+#MSUB -l nodes=16:ppn=8
+#MSUB -l walltime=00:00:55:00 # dd:hh:mm:ss
+#MSUB -d /p/gup1/feham/runs/arn2
+
+#MSUB -m be
+#MSUB -j oe
+
+#MSUB -l partition=up
+
+#MSUB -A stanford
+
+##### DAT-specific options
+##MSUB -A stanfdat
+##MSUB -l qos=expedite
+
+##### run the job
+echo Job ID: $SLURM_JOBID
+echo Start time: `date`
+echo
+
+poe ./deegee
+poe ./cdp_hold
+poe ./deegee
+poe ./cdp_hold
+poe ./deegee
+poe ./cdp_hold
+poe ./deegee
+poe ./cdp_hold
+poe ./deegee
+poe ./cdp_hold
+poe ./deegee
+poe ./cdp_hold
+poe ./deegee
+poe ./cdp_hold
+
+echo End time: `date`

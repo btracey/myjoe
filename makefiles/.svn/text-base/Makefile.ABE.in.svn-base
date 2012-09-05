@@ -1,0 +1,27 @@
+
+PARMETIS_INC = -I$(HOME)/ParMetis-3.1
+PARMETIS_LIB = -L$(HOME)/ParMetis-3.1 -lparmetis
+METIS_LIB = -lmetis
+
+HYPRE_INC = -I$(HOME)/hypre-2.0.0/src/hypre/include
+HYPRE_LIB = -L$(HOME)/hypre-2.0.0/src/hypre/lib -lHYPRE
+
+#MPI_INC = -I/usr/local/mvapich2-0.9.8p2patched-intel-ofed-1.2/include
+
+# for openmp builds
+#CC = /usr/local/mpich/bin/mpicxx
+#CFLAGS = -O3 -I. -Wno-deprecated -I. -DNO_ASSERT -DWITH_PARMETIS -DWITH_HYPRE -fopenmp $(PARMETIS_INC) $(HYPRE_INC)
+#CLIBS = -fopenmp -lgomp $(PARMETIS_LIB) $(HYPRE_LIB) $(METIS_LIB)
+
+#CC = /usr/local/mvapich2-1.2rc2-intel-ofed-1.2/bin/mpicxx
+#CC = /usr/local/intel/10.0.026/bin/icpc
+CC = mpicxx
+#CFLAGS = -O3 -I. -Wno-deprecated -I. -DNO_ASSERT -DWITH_PARMETIS -DWITH_HYPRE -DDEBUG $(PARMETIS_INC) $(HYPRE_INC)
+CFLAGS = -O3 -I. -Wno-deprecated -DWITH_PARMETIS -DWITH_HYPRE -DDEBUG -DMPICH_IGNORE_CXX_SEEK $(PARMETIS_INC) $(HYPRE_INC)
+CLIBS = $(PARMETIS_LIB) $(HYPRE_LIB) $(METIS_LIB)
+
+# archiving tool...
+AR = ar rcv
+
+# archive indexing tool...
+RANLIB = ar -ts
