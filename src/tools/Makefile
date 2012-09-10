@@ -20,12 +20,13 @@ include $(MUM_HOME)/src/common/Makefile.dep
 include $(MUM_HOME)/src/joe/Makefile.dep
 include $(MUM_HOME)/src/tools/Makefile.dep
 
-TOOLS = TestCombustion TestFlamelet CreateChemTable CreateChemTable_new mum_hold ThermoProperties CreatePressureChemTable TestPressureTable ChemLinToTecplot
+TOOLS = TestCombustion TestFlamelet CreateChemTable CreateChemTable_new mum_hold ThermoProperties CreatePressureChemTable TestPressureTable ChemLinToTecplot prepro
 TOOLS_EXECS = $(addprefix $(MUM_HOME)/bin/, $(TOOLS))
 TOOLS_OBJS = $(addsuffix .o, $(TOOLS))
 TOOL_LIBS = $(CLIBS) -lm
 
-COMMON = Param.o MpiStuff.o MiscUtils.o mpi_tommie.o
+COMMON = Param.o MpiStuff.o MiscUtils.o mpi_tommie.o Gp.o Ugp.o UgpWithTools.o \
+	CdpFilter.o MshFilter.o
 COMMON_OBJS = $(addprefix $(MUM_HOME)/src/common/, $(COMMON))
 
 .PHONY: default help clean
@@ -141,7 +142,15 @@ ThermoProperties.o: ThermoProperties.cpp $(Combustion_H)
 	$(CC) -o $@ $(CLD) $^ $(TOOL_LIBS); mv $@ $(MUM_HOME)/bin
 
 ##################################################################################################################
+### preprocessing ###
 
+prepro: prepro.o $(Prepro_DEP)
+	$(CC) -o $@ $(CLD) $(Prepro_DEP) prepro.o $(TOOL_LIBS); mv $@ $(MUM_HOME)/bin
+
+prepro.o: prepro.cpp $(Prepro_H)
+	$(CC) $(CFLAGS) -c prepro.cpp -I $(MUM_HOME)/src/common
+
+##################################################################################################################
 
 
 # Call "common makefile" recursively for all common files (update COMMON variable above if list has changed!)

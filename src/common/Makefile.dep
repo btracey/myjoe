@@ -81,3 +81,10 @@ Combustion_H = $(MUM_HOME)/src/common/mixing_combustion/Combustion.h \
 Flamelet_H = $(MUM_HOME)/src/common/mixing_combustion/Flamelet.h \
              $(Combustion_H) \
              $(CombustionGeneralDefinitions_H)
+             
+# Preprocessing
+################
+Prepro_H = $(Param_H) \
+	       $(UgpWithTools_H) \
+	       $(CdpFilter_H) \
+	       $(MshFilter_H)

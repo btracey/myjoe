@@ -71,3 +71,14 @@ ChemLinToTecplot_DEP = $(MUM_HOME)/src/common/Param.o \
                        $(MUM_HOME)/src/common/mixing_combustion/CombustionGeneralDefinitions.o\
                        $(MUM_HOME)/src/common/mixing_combustion/Table3D.o\
                        $(MUM_HOME)/src/common/mixing_combustion/ChemtableNormalized.o
+                       
+Prepro_DEP = $(MUM_HOME)/src/common/mpi_tommie.o \
+	         $(MUM_HOME)/src/common/MpiStuff.o \
+	         $(MUM_HOME)/src/common/Gp.o \
+	         $(MUM_HOME)/src/common/MiscUtils.o \
+	         $(MUM_HOME)/src/common/Param.o \
+	         $(MUM_HOME)/src/common/Ugp.o \
+	         $(MUM_HOME)/src/common/UgpWithTools.o \
+	         $(MUM_HOME)/src/common/CdpFilter.o \
+	         $(MUM_HOME)/src/common/MshFilter.o
+	

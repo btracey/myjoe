@@ -116,9 +116,12 @@ public:   // constructors/destructors
     mut_fa = NULL;          // defined at faces, allocated in initializeFromRestartFile
     kine   = NULL;          // registerScalar(kine, "kine", CV_DATA);
 
-    // just to take a look at the residual field of energy
+    // just to take a look at the residual fields
     residField  = NULL;     registerScalar(residField,  "residField",  CV_DATA);
-    residField2 = NULL;     registerScalar(residField2, "residField2", CV_DATA); 
+    residField0 = NULL;     registerScalar(residField0, "residField0", CV_DATA);
+    residField1 = NULL;     registerScalar(residField1, "residField1", CV_DATA);
+    residField2 = NULL;     registerScalar(residField2, "residField2", CV_DATA);
+    residField3 = NULL;     registerScalar(residField3, "residField3", CV_DATA);
 
     local_dt = NULL;        registerScalar(local_dt, "local_dt", CV_DATA);
 
@@ -631,9 +634,12 @@ public:   // member variables
 
   double *massFlux_fa;      ///< mass flux for scalar solver
 
-  double *residField;
-  double *residField2;
-  double resid_energ_th;    ///< energy residual treshold
+  double *residField;       ///< residual field for mean flow
+  double *residField0;      ///< residual field for scalar 0
+  double *residField1;      ///< residual field for scalar 1
+  double *residField2;      ///< residual field for scalar 2
+  double *residField3;      ///< residual field for scalar 3
+  double resid_energ_th;    ///< energy residual threshold
 
   double *strMag;           ///< magnitude strain rate
   double *vortMag;          ///< magnitude vorticity

@@ -456,14 +456,12 @@ public:
 	/*
    * Residual visualization in serial
    */
-	void setHistoryFile(ofstream *ConvHist_file);
+	void setHistoryFile();
 	
 	/*
    * Residual visualization in serial
    */
-	void writeHistoryFile(ofstream *ConvHist_file, double *rhsResid, double MaxPressure, double MaxPressureKS, 
-												double WeightPressure, double WeightPressureExit, double SurfacePressure, 
-												double PerSuperVolume, double EquivalentRatio, unsigned long timeused);
+	void writeHistoryFile(double *rhsResid);
   
 	virtual void boundaryHook_mg(double *rho, double (*vel)[3], double *press, FaZone *zone, int iMesh)  { /*empty*/ }
 

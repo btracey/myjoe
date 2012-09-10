@@ -32,21 +32,21 @@ void JoeWithModels::run()
 	
 	string tIntName = getStringParam("TIME_INTEGRATION");
 	
-	if      (tIntName == "FORWARD_EULER")                runForwardEuler();
-	else if (tIntName == "RK")                           runRK();
-	else if (tIntName == "BACKWARD_EULER")               runBackwardEuler();
-	else if (tIntName == "BACKWARD_EULER_MULTIGRID")		 runBackwardEulerMultigrid();
-	else if (tIntName == "BACKWARD_EULER_COUPLED")       runBackwardEulerCoupled();
-	else if (tIntName == "BACKWARD_EULER_SEMICOUPLED")   runBackwardEulerSemiCoupled();
-	else if (tIntName == "BDF2")                         runBDF2();
-	else if (tIntName == "BDF2_SEMICOUPLED")						 runBDF2SemiCoupled();
+	if      (tIntName == "FORWARD_EULER")               runForwardEuler();
+	else if (tIntName == "RK")                          runRK();
+	else if (tIntName == "BACKWARD_EULER")              runBackwardEuler();
+	else if (tIntName == "BACKWARD_EULER_MULTIGRID")    runBackwardEulerMultigrid();
+	else if (tIntName == "BACKWARD_EULER_COUPLED")      runBackwardEulerCoupled();
+	else if (tIntName == "BACKWARD_EULER_SEMICOUPLED")  runBackwardEulerSemiCoupled();
+	else if (tIntName == "BDF2")                        runBDF2();
+	else if (tIntName == "BDF2_SEMICOUPLED")		    runBDF2SemiCoupled();
 	else
 		if (mpi_rank == 0)
 		{
 			cerr << "ERROR: wrong time integration scheme specified !" << endl;
 			cerr << "available integration schemes are: FORWARD_EULER, RK, BACKWARD_EULER, BDF2, BACKWARD_EULER_COUPLED, BACKWARD_EULER_SEMICOUPLED" << endl;
 		}
-	
+
 }
 
 void JoeWithModels::runForwardEuler()
@@ -65,14 +65,7 @@ void JoeWithModels::runForwardEuler()
   double (*dummyA)[5][5] = NULL;       // provide dummy pointer for explicit mode!
   double ***dummyAScal   = NULL;       // provide dummy pointer for explicit mode!
 
-  // Create convergence history file
-  string ConvHist = getStringParam("CONVERGENCE_HISTORY","NO");
-  ofstream ConvHist_file;
-  unsigned long starttime, stoptime, usedtime;
-  if (ConvHist == "YES") { 
-    starttime = clock();
-    setHistoryFile(&ConvHist_file);
-  }
+  if (checkParam("WRITE_HISTORY")) setHistoryFile();
 
   // -------------------------------------------------------------------------------------------
   // update state properties: velocity, pressure, temperature, enthalpy, gamma and R
@@ -193,13 +186,8 @@ void JoeWithModels::runForwardEuler()
 
       showResidue(Residual);
 
-      if (ConvHist == "YES")
-      {				
-        stoptime = clock(); usedtime = stoptime - starttime;
-	double buffer = 0.0;
-        writeHistoryFile(&ConvHist_file, Residual, buffer, buffer, buffer, 
-			 buffer, buffer, buffer, buffer, usedtime);
-      }
+      if (checkParam("WRITE_HISTORY"))
+    	  writeHistoryFile(Residual);
     }
 
     temporalHook();
@@ -224,9 +212,6 @@ void JoeWithModels::runForwardEuler()
 
   delete [] myResidual;
   delete [] Residual;
-
-  if (ConvHist == "YES") 
-    ConvHist_file.close();
 }
 
 void JoeWithModels::runRK()
@@ -263,14 +248,7 @@ void JoeWithModels::runRK()
   double (*dummyA)[5][5] = NULL;       // provide dummy pointer for explicit mode!
   double ***dummyAScal   = NULL;       // provide dummy pointer for explicit mode!
 
-  // Create convergence history file
-  string ConvHist = getStringParam("CONVERGENCE_HISTORY","NO");
-  ofstream ConvHist_file;
-  unsigned long starttime, stoptime, usedtime;
-  if (ConvHist == "YES") { 
-    starttime = clock();
-    setHistoryFile(&ConvHist_file);
-  }
+  if (checkParam("WRITE_HISTORY")) setHistoryFile();
 
   // -------------------------------------------------------------------------------------------
   // update state properties: velocity, pressure, temperature, enthalpy, gamma and R
@@ -518,9 +496,37 @@ void JoeWithModels::runRK()
       myResidual[4] += fabs(drhoE1[icv] + 4.0*drhoE2[icv] + drhoE3[icv]) / 6.0;
       residField[icv] = fabs(drhoE1[icv] + 4.0*drhoE2[icv] + drhoE3[icv]) / 6.0;
     }
+
     for (int iScal = 0; iScal < nScal; iScal++)
-      for (int icv = 0; icv < ncv; icv++)
-        myResidual[5+iScal] += fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv] + drhoScal3[iScal][icv]) / 6.0;
+    {
+    	for (int icv = 0; icv < ncv; icv++)
+    		myResidual[5+iScal] += fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
+    		                            + drhoScal3[iScal][icv])/6.0;
+
+    	switch (iScal)
+    	{
+    	case 0:
+    		for (int icv = 0; icv < ncv; icv++)
+    			residField0[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
+    			                        + drhoScal3[iScal][icv])/6.0;
+    		break;
+    	case 1:
+    		for (int icv = 0; icv < ncv; icv++)
+    			residField1[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
+    					                + drhoScal3[iScal][icv])/6.0;
+    		break;
+    	case 2:
+    		for (int icv = 0; icv < ncv; icv++)
+    			residField2[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
+    			                        + drhoScal3[iScal][icv])/6.0;
+    		break;
+    	case 3:
+    		for (int icv = 0; icv < ncv; icv++)
+    			residField3[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
+    			                        + drhoScal3[iScal][icv])/6.0;
+    		break;
+    	}
+    }
 
     MPI_Allreduce(myResidual, Residual, 5+nScal, MPI_DOUBLE, MPI_SUM, mpi_comm);
 
@@ -531,13 +537,8 @@ void JoeWithModels::runRK()
 
       showResidue(Residual);
 
-      if (ConvHist == "YES")
-      {				
-        stoptime = clock(); usedtime = stoptime - starttime;
-	double buffer = 0.0;
-        writeHistoryFile(&ConvHist_file, Residual, buffer, buffer, buffer, 
-			 buffer, buffer, buffer, buffer, usedtime);
-      }
+      if (checkParam("WRITE_HISTORY"))
+    	  writeHistoryFile(Residual);
     }
 
     temporalHook();
@@ -577,9 +578,6 @@ void JoeWithModels::runRK()
 
   delete [] myResidual;
   delete [] Residual;
-
-  if (ConvHist == "YES") 
-    ConvHist_file.close();
 }
 
 
@@ -602,18 +600,11 @@ void JoeWithModels::runBackwardEuler()
   double **dScal   = NULL;  if (nScal > 0) getMem2D(&dScal,   0, nScal-1, 0, ncv_g-1, "dScal");
   double **rhsScal = NULL;  if (nScal > 0) getMem2D(&rhsScal, 0, nScal-1, 0, ncv-1, "rhsScal");
 
-  // Create convergence history file
-  string ConvHist = getStringParam("CONVERGENCE_HISTORY","NO");
-  ofstream ConvHist_file;
-  unsigned long starttime, stoptime, usedtime;
-  if (ConvHist == "YES") { 
-    starttime = clock();
-    setHistoryFile(&ConvHist_file);
-  }
-
   //------------------------------------
   // some parameters
   //------------------------------------
+  if (checkParam("WRITE_HISTORY")) setHistoryFile();
+
   double underRelax = getDoubleParam("UNDER_RELAXATION", "0.3");
   double underRelaxScalars = getDoubleParam("UNDER_RELAXATION_SCALARS", "0.2");
 
@@ -787,6 +778,22 @@ void JoeWithModels::runBackwardEuler()
                               - AScal[iScal][4][noc] * dq[nbocv_v[noc]][4];
       }
       
+      switch (iScal)
+      {
+      case 0:
+    	  for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhsScal[iScal][icv];
+    	  break;
+      case 1:
+    	  for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhsScal[iScal][icv];
+    	  break;
+      case 2:
+    	  for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhsScal[iScal][icv];
+    	  break;
+      case 3:
+    	  for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhsScal[iScal][icv];
+    	  break;
+      }
+
       solveLinSysScalar(dScal[iScal], AScal[iScal][5], rhsScal[iScal],
                         scalarTranspEqVector[iScal].phiZero,
                         scalarTranspEqVector[iScal].phiZeroRel,
@@ -852,13 +859,8 @@ void JoeWithModels::runBackwardEuler()
 
       showResidue(Residual);
 
-      if (ConvHist == "YES")
-      {				
-        stoptime = clock(); usedtime = stoptime - starttime;
-	double buffer = 0.0;
-        writeHistoryFile(&ConvHist_file, Residual, buffer, buffer, buffer, 
-			 buffer, buffer, buffer, buffer, usedtime);
-      }
+      if (checkParam("WRITE_HISTORY"))
+    	  writeHistoryFile(Residual);
     }
 
     temporalHook();
@@ -906,9 +908,6 @@ void JoeWithModels::runBackwardEuler()
   if (nScal > 0) freeMem3D(AScal,   0, nScal-1, 0, 5, 0, nbocv_s-1);
   if (nScal > 0) freeMem2D(dScal,   0, nScal-1, 0, ncv_g-1);
   if (nScal > 0) freeMem2D(rhsScal, 0, nScal-1, 0, ncv-1);
-
-  if (ConvHist == "YES") 
-    ConvHist_file.close();
 }
 
 
@@ -3863,18 +3862,11 @@ void JoeWithModels::runBackwardEulerCoupled()
   double **rhs;          getMem2D(&rhs, 0, ncv-1,     0, 5+nScal-1,               "JoeWithModels::runBackwardEulerCoupled -> rhs", true);
   double **dq;           getMem2D(&dq,  0, ncv_g-1,   0, 5+nScal-1,               "JoeWithModels::runBackwardEulerCoupled -> dq",  true);
 
-  // Create convergence history file
-  string ConvHist = getStringParam("CONVERGENCE_HISTORY","NO");
-  ofstream ConvHist_file;
-  unsigned long starttime, stoptime, usedtime;
-  if (ConvHist == "YES") { 
-    starttime = clock();
-    setHistoryFile(&ConvHist_file);
-  }
-
   //------------------------------------
   // some parameters
   //------------------------------------
+  if (checkParam("WRITE_HISTORY")) setHistoryFile();
+
   double underRelax = getDoubleParam("UNDER_RELAXATION", "0.3");
   double underRelaxScalars = getDoubleParam("UNDER_RELAXATION_SCALARS", "0.2");
 	
@@ -3986,21 +3978,38 @@ void JoeWithModels::runBackwardEulerCoupled()
       
     MPI_Allreduce(myResidual, Residual, 5+nScal, MPI_DOUBLE, MPI_SUM, mpi_comm);
 
+    for (int icv = 0; icv < ncv; icv++) residField[icv] = rhs[icv][4];
 
+    for (int iScal = 0; iScal < nScal; iScal ++)
+    {
+      switch (iScal)
+      {
+      case 0:
+    	for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhs[icv][5+iScal];
+    	break;
+      case 1:
+  	    for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhs[icv][5+iScal];
+  	    break;
+      case 2:
+  	    for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhs[icv][5+iScal];
+  	    break;
+      case 3:
+  	    for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhs[icv][5+iScal];
+  	    break;
+      }
+    }
     // ---------------------------------------------------------------------------------
     // solve linear system for the NSE
     // ---------------------------------------------------------------------------------
     
-    for (int icv = 0; icv < ncv; icv++)                                     // prepare rhs and A
+    for (int icv = 0; icv < ncv; icv++)              // prepare rhs and A
     {
-      residField[icv] = rhs[icv][4];
-
-      for (int i = 0; i < 5+nScal; i++)                                     // relaxation
+      for (int i = 0; i < 5+nScal; i++)              // relaxation
         rhs[icv][i] *= underRelax;
 
       double tmp = cv_volume[icv]/(local_dt[icv]);
       for (int i = 0; i < 5+nScal; i++)
-        A[nbocv_i[icv]][i][i] += tmp;                                   // diagonal part ( vol/dt + A )
+        A[nbocv_i[icv]][i][i] += tmp;                // diagonal part ( vol/dt + A )
     }      
     
 //    For debugging Jacobi matrix A
@@ -4076,13 +4085,8 @@ void JoeWithModels::runBackwardEulerCoupled()
 
       showResidue(Residual);
 
-      if (ConvHist == "YES")
-      {				
-        stoptime = clock(); usedtime = stoptime - starttime;
-	double buffer = 0.0;
-        writeHistoryFile(&ConvHist_file, Residual, buffer, buffer, buffer, 
-			 buffer, buffer, buffer, buffer, usedtime);
-      }
+      if (checkParam("WRITE_HISTORY"))
+    	  writeHistoryFile(Residual);
     }
 
     temporalHook();
@@ -4124,9 +4128,6 @@ void JoeWithModels::runBackwardEulerCoupled()
   freeMem3D(A,   0, nbocv_s-1, 0, 5+nScal-1, 0, 5+nScal-1);         A   = NULL;
   freeMem2D(rhs, 0, ncv-1,     0, 5+nScal-1);                       rhs = NULL;
   freeMem2D(dq,  0, ncv_g-1,   0, 5+nScal-1);                       dq  = NULL;
-
-  if (ConvHist == "YES") 
-    ConvHist_file.close();
 }
 
 
@@ -5383,18 +5384,11 @@ void JoeWithModels::runBackwardEulerSemiCoupled()
   double **rhsScal = NULL;  if (nScalUncoupled > 0) getMem2D(&rhsScal, 0, nScalUncoupled-1, 0, ncv-1, "rhsScal", true);
   double **dScal   = NULL;  if (nScalUncoupled > 0) getMem2D(&dScal,   0, nScalUncoupled-1, 0, ncv_g-1, "dScal", true);
   
-  // Create convergence history file
-  string ConvHist = getStringParam("CONVERGENCE_HISTORY","NO");
-  ofstream ConvHist_file;
-  unsigned long starttime, stoptime, usedtime;
-  if (ConvHist == "YES") { 
-    starttime = clock();
-    setHistoryFile(&ConvHist_file);
-  }
-	
   //------------------------------------
   // some parameters
   //------------------------------------
+  if (checkParam("WRITE_HISTORY")) setHistoryFile();
+
   double underRelax = getDoubleParam("UNDER_RELAXATION", "0.3");
   double underRelaxScalars = getDoubleParam("UNDER_RELAXATION_SCALARS", "0.2");
 
@@ -5499,20 +5493,38 @@ void JoeWithModels::runBackwardEulerSemiCoupled()
     
     calcRhsSemiCoupled(rhs, rhsScal, A, AScal, nScalCoupled, nScalUncoupled, true);
     
+    for (int icv = 0; icv < ncv; icv++) residField[icv] = rhs[icv][4];
+
+    for (int iScal = 0; iScal < nScalCoupled; iScal ++)
+    {
+      switch (iScal)
+      {
+      case 0:
+    	for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhs[icv][5+iScal];
+    	break;
+      case 1:
+  	    for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhs[icv][5+iScal];
+  	    break;
+      case 2:
+  	    for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhs[icv][5+iScal];
+  	    break;
+      case 3:
+  	    for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhs[icv][5+iScal];
+  	    break;
+      }
+    }
     // ---------------------------------------------------------------------------------
     // solve linear system for the NSE
     // ---------------------------------------------------------------------------------
     
-    for (int icv = 0; icv < ncv; icv++)                                     // prepare rhs and A
+    for (int icv = 0; icv < ncv; icv++)               // prepare rhs and A
     {
-      residField[icv] = rhs[icv][4];
-
-      for (int i = 0; i < 5+nScalCoupled; i++)                              // relaxation
+      for (int i = 0; i < 5+nScalCoupled; i++)        // relaxation
         rhs[icv][i] *= underRelax;
 
       double tmp = cv_volume[icv]/(local_dt[icv]);
       for (int i = 0; i < 5+nScalCoupled; i++)
-        A[nbocv_i[icv]][i][i] += tmp;                                       // diagonal part ( vol/dt + A )
+        A[nbocv_i[icv]][i][i] += tmp;                 // diagonal part ( vol/dt + A )
     }      
     
     // solve linear system    
@@ -5581,7 +5593,23 @@ void JoeWithModels::runBackwardEulerSemiCoupled()
                                            - AScal[iScalUncoupled][3][noc] * dq[nbocv_v[noc]][3]
                                            - AScal[iScalUncoupled][4][noc] * dq[nbocv_v[noc]][4];
         }
-        
+
+        switch (iScal)
+        {
+        case 0:
+        	for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhsScal[iScalUncoupled][icv];
+        	break;
+        case 1:
+        	for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhsScal[iScalUncoupled][icv];
+        	break;
+        case 2:
+        	for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhsScal[iScalUncoupled][icv];
+        	break;
+        case 3:
+        	for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhsScal[iScalUncoupled][icv];
+        	break;
+        }
+
         solveLinSysScalar(dScal[iScalUncoupled], AScal[iScalUncoupled][5], rhsScal[iScalUncoupled],
                           scalarTranspEqVector[iScal].phiZero,
                           scalarTranspEqVector[iScal].phiZeroRel,
@@ -5661,114 +5689,8 @@ void JoeWithModels::runBackwardEulerSemiCoupled()
 
       showResidue(Residual);
 		
-      if (ConvHist == "YES")
-      {
-				// Max pressure computation using standard arithmetics, and Kreisselmeier-Steinhauser formula
-        double myMaxPress[1] = {0.0}, MaxPress[1] = {0.0};
-				double myMaxPressKS[1] = {0.0}, MaxPressKS[1] = {0.0};
-        for (int icv = 0; icv < ncv; icv++) {
-          myMaxPress[0] = max(myMaxPress[0], press[icv]);
-					myMaxPressKS[0] += exp (1.1*press[icv]);
-				}
-        MPI_Allreduce(myMaxPress, MaxPress, 1, MPI_DOUBLE, MPI_MAX, mpi_comm);
-        MPI_Allreduce(myMaxPressKS, MaxPressKS, 1, MPI_DOUBLE, MPI_SUM, mpi_comm);
-
-				// Weight pressure computation total and exit.
-        double myWeightPress[1] = {0.0}, WeightPress[1] = {0.0};
-				double myWeightPressExit[1] = {0.0}, WeightPressExit[1] = {0.0};
-        for (int icv = 0; icv < ncv; icv++) {
-          myWeightPress[0] += press[icv]*cv_volume[icv];
-					if ((x_cv[icv][0] >= 0.64) && (x_cv[icv][0] <= 0.65))
-						myWeightPressExit[0] += press[icv]*cv_volume[icv];
-				}
-        MPI_Allreduce(myWeightPress, WeightPress, 1, MPI_DOUBLE, MPI_SUM, mpi_comm);
-				MPI_Allreduce(myWeightPressExit, WeightPressExit, 1, MPI_DOUBLE, MPI_SUM, mpi_comm);			
-
-				// Supersonic volume computation, and volume of the final part of the combustor.
-        double myVolume[4] = {0.0, 0.0, 0.0, 0.0}, Volume[4] = {0.0, 0.0, 0.0, 0.0};
-        for (int icv = 0; icv < ncv; icv++) {
-          double velMag = sqrt(vel[icv][0]*vel[icv][0]+vel[icv][1]*vel[icv][1]+vel[icv][2]*vel[icv][2]);
-          double mach = fabs(velMag)/sos[icv];
-          if (mach >= 1.0) myVolume[0] += cv_volume[icv];
-          else myVolume[1] += cv_volume[icv];
-          myVolume[2] += cv_volume[icv];
-					if ((x_cv[icv][0] >= 0.64) && (x_cv[icv][0] <= 0.65))
-						myVolume[3] += cv_volume[icv];
-        }
-        MPI_Allreduce(myVolume, Volume, 4, MPI_DOUBLE, MPI_SUM, mpi_comm);
-				
-//				// Surface pressure integral.
-//				double mySurfacePress[1] = {0.0}, SurfacePress[1] = {0.0}, Area = 0.0;
-//
-//				for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++) {
-//					if (zone->getKind() == FA_ZONE_BOUNDARY) { 
-//						Param *param;
-//						if (getParam(param, zone->getName())) {  
-//							string name = zone->getName();
-//							if (name == "bodywall") { 
-//								for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++) { 
-//									int icv0 = cvofa[ifa][0];
-//									assert( icv0 >= 0 );
-//									if ((x_cv[icv0][0] >= 0.64) && (x_cv[icv0][0] <= 0.65)) {
-//										double nVec[3];
-//										double area = normVec3d(nVec, fa_normal[ifa]);
-//										mySurfacePress[0] += press[icv0]*fa_normal[ifa][1];
-//										Area += area;
-//									}
-//								}
-//							}
-//						}
-//					}
-//				}
-//				mySurfacePress[0] /= (Area+1E-10);
-//        MPI_Allreduce(mySurfacePress, SurfacePress, 1, MPI_DOUBLE, MPI_SUM, mpi_comm);
-				
-				// Compute mass fluxes
-				double myMassFlux[2] = {0.0, 0.0}, MassFlux[2] = {0.0, 0.0};
-						
-				for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++) {
-					if (zone->getKind() == FA_ZONE_BOUNDARY) { 
-						Param *param;
-						if (getParam(param, zone->getName())) {  
-							string name = zone->getName();
-							
-							if (name == "injector") { 
-								for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++) { 
-									int icv0 = cvofa[ifa][0];
-									assert( icv0 >= 0 );
-									double nVec[3];
-									double area = normVec3d(nVec, fa_normal[ifa]);
-									myMassFlux[0] += (rhou[icv0][0]*fa_normal[ifa][0] + rhou[icv0][1]*fa_normal[ifa][1] + rhou[icv0][2]*fa_normal[ifa][2]);							
-								}
-							}
-							
-							if (name == "inlet") { 
-								for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++) { 
-									int icv0 = cvofa[ifa][0];
-									assert( icv0 >= 0 );
-									double nVec[3];
-									double area = normVec3d(nVec, fa_normal[ifa]);
-									myMassFlux[1] += (rhou[icv0][0]*fa_normal[ifa][0] + rhou[icv0][1]*fa_normal[ifa][1] + rhou[icv0][2]*fa_normal[ifa][2]);							
-								}
-							}
-							
-						}
-					}
-				}
-				MPI_Allreduce(myMassFlux, MassFlux, 2, MPI_DOUBLE, MPI_SUM, mpi_comm);
-				
-        stoptime = clock(); usedtime = stoptime - starttime;
-        double MaxPressure = MaxPress[0]*1E-5;
-				double MaxPressureKS = 0.0; //(1.0/1.1)*log(MaxPressKS[0]);
-        double WeightPressure = WeightPress[0]*1E-5/Volume[2];
-				double WeightPressureExit = WeightPressExit[0]*1E-5/Volume[3];
-				double SurfacePressure = 0.0; //SurfacePress[0];
-        double PerSuperVolume = Volume[0]*100.0/Volume[2];
-				double EquivalentRatio = (16/1.008) * (0.5/0.233) * (MassFlux[0] / MassFlux[1]);
-
-        writeHistoryFile(&ConvHist_file, Residual, MaxPressure, MaxPressureKS, WeightPressure, WeightPressureExit, 
-												 SurfacePressure, PerSuperVolume, EquivalentRatio, usedtime);
-      }
+      if (checkParam("WRITE_HISTORY"))
+    	  writeHistoryFile(Residual);
     }
 
 
@@ -12963,12 +12885,28 @@ void JoeWithModels::calcTimeInt(double *RHSrho, double (*RHSrhou)[3], double *RH
 	
 }
 
-void JoeWithModels::setHistoryFile(ofstream *ConvHist_file) {
-  int nScal = scalarTranspEqVector.size();
+void JoeWithModels::setHistoryFile()
+{
+    FILE *fp;
+	char fname[200] = "history.dat";
+	int nScal = scalarTranspEqVector.size();
 
-  ConvHist_file->open("history.plt", ios::out);
+	if (mpi_rank == 0)
+	{
+		if ( (fp = fopen(fname,"wt"))== NULL )
+		{
+			cerr << "Error: cannot open file" << fname << endl;
+			throw(-1);
+		}
+		fprintf(fp, "VARIABLES = \"Iter\" \"Res_rho\" \"Res_rhou-X\" \"Res_rhou-Y\" \"Res_rhou-Z\" \"Res_rhoE\"");
+		for (int iScal = 0; iScal < nScal; iScal++)
+			fprintf(fp," \"Res_%s\"",scalarTranspEqVector[iScal].getName());
+		fprintf(fp,"\nZone T = \"residuals\" F = point\n");
+
+		fclose(fp);
+	}
 	
-  if (mpi_rank == 0) {
+  /*if (mpi_rank == 0) {
     ConvHist_file[0] << "VARIABLES = \"Iter\"";
     ConvHist_file[0] << " \"Res_rho\" \"Res_rhou-X\" \"Res_rhou-Y\" \"Res_rhou-Z\" \"Res_rhoE\"";
     
@@ -12978,39 +12916,32 @@ void JoeWithModels::setHistoryFile(ofstream *ConvHist_file) {
     ConvHist_file[0] << " \"MaxPress\" \"MaxPress(KS)\" \"WeightPress(total)\" \"WeightPress(Exit)\" \"WeightPress(Surface)\"";
     ConvHist_file[0] << " \"SuperVolume\" \"EquivalentRatio\" \"Time(min)\"" << endl;
     ConvHist_file[0] << "Zone T = \"residuals\" F = point" << endl;
-  }
+  }*/
 }
 
-void JoeWithModels::writeHistoryFile(ofstream *ConvHist_file, double *rhsResid, double MaxPressure, double MaxPressureKS, 
-																		 double WeightPressure, double WeightPressureExit, double SurfacePressure, 
-																		 double PerSuperVolume, double EquivalentRatio, unsigned long timeused) {
+void JoeWithModels::writeHistoryFile(double *rhsResid)
+{
+    FILE *fp;
+	char fname[200] = "history.dat";
+	int nScal = scalarTranspEqVector.size();
 
-  int nScal = scalarTranspEqVector.size();
-  
-  if (mpi_rank == 0)
-    {
-      ConvHist_file[0] << setw(6) << step;
+	if (mpi_rank == 0)
+	{
+		if ( (fp = fopen(fname,"a"))== NULL )
+		{
+			cerr << "Error: cannot open file" << fname << endl;
+			throw(-1);
+		}
+		fprintf(fp,"%8d",step);
+		fprintf(fp,"%14.4e%14.4e%14.4e%14.4e%14.4e",
+				log10(rhsResid[0]), log10(rhsResid[1]), log10(rhsResid[2]),
+				log10(rhsResid[3]), log10(rhsResid[4]));
       
-      ConvHist_file[0] << scientific << setprecision(6)
-		       << setw(16) << log10(rhsResid[0])
-		       << setw(16) << log10(rhsResid[1])
-		       << setw(16) << log10(rhsResid[2])
-		       << setw(16) << log10(rhsResid[3])
-		       << setw(16) << log10(rhsResid[4]);
-
-      for (int iScal = 0; iScal < nScal; iScal++)
-	ConvHist_file[0] << setw(16) << log10(rhsResid[5+iScal]);
+		for (int iScal = 0; iScal < nScal; iScal++)
+			fprintf(fp,"%14.4e",log10(rhsResid[5 + iScal]));
       
-      ConvHist_file[0] << setw(16) << MaxPressure
-		       << setw(16) << MaxPressureKS
-		       << setw(16) << WeightPressure
-		       << setw(16) << WeightPressureExit
-		       << setw(16) << SurfacePressure
-		       << setw(16) << PerSuperVolume
-		       << setw(16) << EquivalentRatio;
-
-      ConvHist_file[0] << fixed << setprecision(6)
-		       << setw(16) << double(timeused)/(CLOCKS_PER_SEC*60.0) << endl;
+		fprintf(fp,"\n");
+		fclose(fp);
     }
 }
 

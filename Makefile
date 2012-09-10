@@ -11,7 +11,7 @@ SHELL = /bin/sh
 # Includes machine specific compilation options
 include $(MUM_HOME)/Makefile.in
 
-.PHONY: default help all clean_common clean_joe clean_ray clean_charles clean_tools clean
+.PHONY: default help all clean_common clean_joe clean_ray clean_tools clean
 
 default: help
 
@@ -22,12 +22,10 @@ help:
 	@echo 'all :             builds common files, joe, ray, charles and tools'
 	@echo 'joe :             compiles our RANS code'
 	@echo 'ray :             compiles our UQ manager'
-	@echo 'charles :         compiles our LES code'
 	@echo 'common :          compiles all common files'
 	@echo 'tools :           compile only the tools'
 	@echo 'clean_joe :       clean all joe objects and executable files (included in common)'
 	@echo 'clean_ray :       clean all ray objects and executable files (included in common)'
-	@echo 'clean_charles :   clean all charles objects and executable files (included in common)'
 	@echo 'clean_tools :     clean all tools'
 	@echo 'clean_common :    clean common files'
 	@echo 'clean :           clean all objects and executable files (common and tools included)'
@@ -47,9 +45,6 @@ joe:
 
 ray:
 	$(MAKE) $@ -C $(MUM_HOME)/src/ray
-
-charles:
-	@echo 'Not yet implemented!'
 
 tools:
 	$(MAKE) $@ -C $(MUM_HOME)/src/tools
