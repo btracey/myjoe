@@ -129,9 +129,23 @@ public:
     MPI_Barrier(mpi_comm);
   }
 
+  void transformMeshHook()
+  {
+    if (!checkParam("TRANSFORM_MESH")) return;
+
+    double scl_mesh = getDoubleParam("SCL_MESH", "1.0");
+    for (int ino = 0; ino < getNno(); ++ino)
+      x_no[ino][0] *= scl_mesh;
+
+    // clearFlag for wall distance to recompute the wallDist when mesh deformed
+    DoubleScalar *wallD = getScalarData("wallDist");
+    wallD->clearFlag();
+  }
+
   virtual void temporalHook()
   {
     if (step%10 == 0)
+    {
       for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
         if (zone->getKind() == FA_ZONE_BOUNDARY)
         {
@@ -140,6 +154,7 @@ public:
             if (param->getString() == "WALL")
               writeWallValues(zone->getName());
         }
+    }
   }
 
   virtual void finalHook()
@@ -245,7 +260,256 @@ public:
   virtual ~MyJoeWX() {}
 };
 
+/*
+ * MyJoe with Durbin v2-f Model
+ */
+class MyJoeV2F : public MyJoe, public RansTurbV2F
+{
+public:
+  MyJoeV2F(char *name) : MyJoe(name), UgpWithCvCompFlow(name)
+  {
+    if (mpi_rank == 0)
+      cout << "MyJoeV2F()" << endl;
+  }
 
+  virtual ~MyJoeV2F() {}
+};
+/*
+ * Flat channel with periodic bc's, SST
+ */
+class PerChanSST: public MyJoeSST{
+protected:
+  int    nn;             // number of nodes in input profile
+  int    nval;           // number of variables in input profile
+  double **boundVal;     // holder for input profile data
+
+public:
+  PerChanSST(char *name) : MyJoeSST(name), UgpWithCvCompFlow(name)
+  {
+    if (mpi_rank == 0) cout << "PerChanSST()" << endl;
+    boundVal = NULL;
+  }
+
+  virtual ~PerChanSST()
+  {
+    if (boundVal != NULL) delete []boundVal;
+  }
+
+  void initialHook()
+  {
+    JoeWithModels::initialHook();
+
+    if (checkParam("SET_INIT_PROFILE"))
+    {
+      // Read inlet variable profile
+      // file has variables y, rho, u, v, press, ...
+      FILE *ifile;
+      if ((ifile=fopen("./profiles.dat", "rt")) == NULL)
+      {
+        cout << "could not open profiles.dat, apply boundary from input file" << endl;
+        throw(-1);
+      }
+
+      fscanf(ifile, "n=%d\td=%d", &nn, &nval);
+      boundVal = new double *[nn];
+      for (int i = 0; i < nn; i++)
+        boundVal[i] = new double [nval];
+
+      for (int i=0; i<nn; i++)
+        for (int v = 0; v < nval; v++)
+          fscanf(ifile, "%lf", &boundVal[i][v]);
+
+      fclose(ifile);
+
+      // Specify initial condition over whole flow
+
+      if(!checkDataFlag(rho))
+      {
+        for (int icv=0; icv<ncv; icv++)
+        {
+          int pos=1;
+          // while pos and pos-1 dont sandwich x_cv, keep increasing pos
+          while(boundVal[pos][0] < x_cv[icv][1] && (pos<nn-1))       pos++;
+
+          double f;
+          // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
+          if      (x_cv[icv][1] > boundVal[pos][0])    f = 1.0;
+          // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
+          else if (x_cv[icv][1] < boundVal[pos-1][0])  f = 0.0;
+          else    f = (x_cv[icv][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+          double rho1 = boundVal[pos-1][1];
+          double rho2 = boundVal[pos][1];
+          rho[icv] = rho1+f*(rho2-rho1);
+
+          double uvel1 = boundVal[pos-1][2];
+          double uvel2 = boundVal[pos][2];
+          rhou[icv][0] = uvel1*rho1+f*(uvel2*rho2-uvel1*rho1);
+          rhou[icv][1] = rhou[icv][2]=0.0;
+
+          double press1 = boundVal[pos-1][4];
+          double press2 = boundVal[pos][4];
+          press[icv] = press1+f*(press2-press1);
+
+          rhoE[icv] = press[icv]/(gamma[icv]-1.0)+0.5/rho[icv]*vecDotVec3d(rhou[icv],rhou[icv]);
+
+          double kine1 = boundVal[pos-1][5];
+          double kine2 = boundVal[pos][5];
+          kine[icv] = kine1+f*(kine2-kine1);
+
+          double omega1 = boundVal[pos-1][6];
+          double omega2 = boundVal[pos][6];
+          omega[icv] = omega1+f*(omega2-omega1);
+        }
+
+        updateCvData(rhou, REPLACE_ROTATE_DATA);
+        updateCvData(rho, REPLACE_DATA);
+        updateCvData(rhoE, REPLACE_DATA);
+        updateCvData(kine, REPLACE_DATA);
+        updateCvData(omega, REPLACE_DATA);
+      }
+    }
+  }
+
+  void sourceHook(double *rhs_rho, double (*rhs_rhou)[3], double *rhs_rhoE, double (*A)[5][5])
+  {
+    double grav  = getDoubleParam("grav",  "1.00");
+    for (int icv = 0; icv < ncv; icv++)
+    {
+      rhs_rhou[icv][0] += rho[icv]*cv_volume[icv]*grav;
+      rhs_rhoE[icv] += rhou[icv][0]*cv_volume[icv]*grav;
+
+      if (A != NULL){
+        A[nbocv_i[icv]][1][0] -= cv_volume[icv]*grav;
+        A[nbocv_i[icv]][4][1] -= cv_volume[icv]*grav;
+      }
+    }
+  }
+};
+
+/*
+ * Flat channel with periodic bc's, V2F
+ */
+class PerChanV2F: public MyJoeV2F{
+protected:
+  int    nn;             // number of nodes in input profile
+  int    nval;           // number of variables in input profile
+  double **boundVal;     // holder for input profile data
+
+public:
+  PerChanV2F(char *name) : MyJoeV2F(name), UgpWithCvCompFlow(name)
+  {
+    if (mpi_rank == 0) cout << "PerChanV2F()" << endl;
+    boundVal = NULL;
+  }
+
+  virtual ~PerChanV2F()
+  {
+    if (boundVal != NULL) delete []boundVal;
+  }
+
+  void initialHook()
+  {
+    JoeWithModels::initialHook();
+
+    if (checkParam("SET_INIT_PROFILE"))
+    {
+      // Read inlet variable profile
+      // file has variables y, rho, u, v, press, ...
+      FILE *ifile;
+      if ((ifile=fopen("./profiles.dat", "rt")) == NULL)
+      {
+        cout << "could not open profiles.dat, apply boundary from input file" << endl;
+          throw(-1);
+      }
+
+      fscanf(ifile, "n=%d\td=%d", &nn, &nval);
+      boundVal = new double *[nn];
+      for (int i = 0; i < nn; i++)
+        boundVal[i] = new double [nval];
+
+      for (int i=0; i<nn; i++)
+        for (int v=0; v<nval; v++)
+          fscanf(ifile, "%lf", &boundVal[i][v]);
+
+      fclose(ifile);
+
+      // Specify initial condition over whole flow
+
+      if(!checkDataFlag(rho))
+      {
+        for (int icv=0; icv<ncv; icv++)
+        {
+          int pos=1;
+          // while pos and pos-1 dont sandwich x_cv, keep increasing pos
+          while(boundVal[pos][0] < x_cv[icv][1] && (pos<nn-1))       pos++;
+
+          double fi;
+          // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
+          if      (x_cv[icv][1] > boundVal[pos][0])    fi = 1.0;
+          // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
+          else if (x_cv[icv][1] < boundVal[pos-1][0])  fi = 0.0;
+          else    fi = (x_cv[icv][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+          double rho1 = boundVal[pos-1][1];
+          double rho2 = boundVal[pos][1];
+          rho[icv] = rho1+fi*(rho2-rho1);
+
+          double uvel1 = boundVal[pos-1][2];
+          double uvel2 = boundVal[pos][2];
+          rhou[icv][0] = uvel1*rho1+fi*(uvel2*rho2-uvel1*rho1);
+          rhou[icv][1] = rhou[icv][2]=0.0;
+
+          double press1 = boundVal[pos-1][4];
+          double press2 = boundVal[pos][4];
+          press[icv] = press1+fi*(press2-press1);
+
+          double kine1 = boundVal[pos-1][5];
+          double kine2 = boundVal[pos][5];
+          kine[icv] = kine1+fi*(kine2-kine1);
+
+          rhoE[icv] = press[icv]/(gamma[icv]-1.0) +
+              0.5/rho[icv]*vecDotVec3d(rhou[icv],rhou[icv]) +
+              rho[icv]*kine[icv];
+
+          double eps1 = boundVal[pos-1][6];
+          double eps2 = boundVal[pos][6];
+          eps[icv] = eps1+fi*(eps2-eps1);
+
+          double v21 = boundVal[pos-1][7];
+          double v22 = boundVal[pos][7];
+          v2[icv] = v21 + fi*(v22 - v21);
+
+          double f1 = boundVal[pos-1][8];
+          double f2 = boundVal[pos][8];
+          f[icv] = f1 + fi*(f2 - f1);
+        }
+
+        updateCvData(rhou, REPLACE_ROTATE_DATA);
+        updateCvData(rho, REPLACE_DATA);
+        updateCvData(rhoE, REPLACE_DATA);
+        updateCvData(kine, REPLACE_DATA);
+        updateCvData(eps, REPLACE_DATA);
+        updateCvData(v2, REPLACE_DATA);
+        updateCvData(f, REPLACE_DATA);
+      }
+    }
+  }
+
+  void sourceHook(double *rhs_rho, double (*rhs_rhou)[3], double *rhs_rhoE, double (*A)[5][5]){
+    double grav  = getDoubleParam("grav",  "1.00");
+    for (int icv = 0; icv < ncv; icv++){
+        rhs_rhou[icv][0] += rho[icv]*cv_volume[icv]*grav;
+        rhs_rhoE[icv] += rhou[icv][0]*cv_volume[icv]*grav;
+
+        if (A != NULL){
+            A[nbocv_i[icv]][1][0] -= cv_volume[icv]*grav;
+            A[nbocv_i[icv]][4][1] -= cv_volume[icv]*grav;
+        }
+    }
+  }
+
+};
 
 
 
@@ -294,6 +558,10 @@ int main(int argc, char *argv[])
     case 1:   joe = new MyJoeSA(inputFileName);      break;
     case 2:   joe = new MyJoeSST(inputFileName);     break;
     case 3:   joe = new MyJoeWX(inputFileName);      break;
+    case 4:   /*k-eps*/                              break;
+    case 5:   joe = new MyJoeV2F(inputFileName);     break;
+    case 6:   joe = new PerChanSST(inputFileName);   break;
+    case 7:   joe = new PerChanV2F(inputFileName);   break;
     default: 
       if (mpi_rank == 0)
         cerr << "ERROR: run number not available!" << endl;
@@ -335,6 +603,7 @@ int main(int argc, char *argv[])
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
   return (0);
+
 }
 
 

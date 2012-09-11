@@ -115,6 +115,8 @@ public:   // constructors/destructors
     // turbulence 
     mut_fa = NULL;          // defined at faces, allocated in initializeFromRestartFile
     kine   = NULL;          // registerScalar(kine, "kine", CV_DATA);
+    rij_diag        = NULL;     registerVector(rij_diag,        "rij_diag",        CV_DATA);
+    rij_offdiag     = NULL;     registerVector(rij_offdiag,     "rij_offdiag",     CV_DATA);
 
     // just to take a look at the residual fields
     residField  = NULL;     registerScalar(residField,  "residField",  CV_DATA);
@@ -323,8 +325,6 @@ public:   // constructors/destructors
     check_interval = getIntParam("CHECK_INTERVAL", "10");
 
     resid_energ_th = getDoubleParam("RESID_ENERG_TH", 0.0);
-
-
 
     // ----------------------------------------------------------------------------------------
     // set Navier-Stokes solver
@@ -630,6 +630,8 @@ public:   // member variables
   
   double *mut_fa;           ///< turbulent viscosity at cell faces
   double *kine;     
+  double (*rij_diag)[3];    ///< diagonal Reynolds stresses at cel center from ASBM
+  double (*rij_offdiag)[3]; ///< off diagonal Reynolds stresses at cel center from ASBM
   //  double *kine, *eps;         ///< turbulent kinetic energy and turbulent dissipation 
 
   double *massFlux_fa;      ///< mass flux for scalar solver

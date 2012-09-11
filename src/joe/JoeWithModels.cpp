@@ -41,11 +41,11 @@ void JoeWithModels::run()
 	else if (tIntName == "BDF2")                        runBDF2();
 	else if (tIntName == "BDF2_SEMICOUPLED")		    runBDF2SemiCoupled();
 	else
-		if (mpi_rank == 0)
-		{
-			cerr << "ERROR: wrong time integration scheme specified !" << endl;
-			cerr << "available integration schemes are: FORWARD_EULER, RK, BACKWARD_EULER, BDF2, BACKWARD_EULER_COUPLED, BACKWARD_EULER_SEMICOUPLED" << endl;
-		}
+	  if (mpi_rank == 0)
+	  {
+	    cerr << "ERROR: wrong time integration scheme specified !" << endl;
+	    cerr << "available integration schemes are: FORWARD_EULER, RK, BACKWARD_EULER, BDF2, BACKWARD_EULER_COUPLED, BACKWARD_EULER_SEMICOUPLED" << endl;
+	  }
 
 }
 
@@ -12887,62 +12887,50 @@ void JoeWithModels::calcTimeInt(double *RHSrho, double (*RHSrhou)[3], double *RH
 
 void JoeWithModels::setHistoryFile()
 {
-    FILE *fp;
-	char fname[200] = "history.dat";
-	int nScal = scalarTranspEqVector.size();
+  FILE *fp;
+  char fname[200] = "history.dat";
+  int nScal = scalarTranspEqVector.size();
 
-	if (mpi_rank == 0)
-	{
-		if ( (fp = fopen(fname,"wt"))== NULL )
-		{
-			cerr << "Error: cannot open file" << fname << endl;
-			throw(-1);
-		}
-		fprintf(fp, "VARIABLES = \"Iter\" \"Res_rho\" \"Res_rhou-X\" \"Res_rhou-Y\" \"Res_rhou-Z\" \"Res_rhoE\"");
-		for (int iScal = 0; iScal < nScal; iScal++)
-			fprintf(fp," \"Res_%s\"",scalarTranspEqVector[iScal].getName());
-		fprintf(fp,"\nZone T = \"residuals\" F = point\n");
-
-		fclose(fp);
-	}
-	
-  /*if (mpi_rank == 0) {
-    ConvHist_file[0] << "VARIABLES = \"Iter\"";
-    ConvHist_file[0] << " \"Res_rho\" \"Res_rhou-X\" \"Res_rhou-Y\" \"Res_rhou-Z\" \"Res_rhoE\"";
-    
+  if (mpi_rank == 0)
+  {
+    if ( (fp = fopen(fname,"wt"))== NULL )
+    {
+      cerr << "Error: cannot open file" << fname << endl;
+      throw(-1);
+    }
+    fprintf(fp, "VARIABLES = \"Iter\" \"Res_rho\" \"Res_rhou-X\" \"Res_rhou-Y\" \"Res_rhou-Z\" \"Res_rhoE\"");
     for (int iScal = 0; iScal < nScal; iScal++)
-      ConvHist_file[0] << " \"Res_" << scalarTranspEqVector[iScal].getName() << "\"";
+      fprintf(fp," \"Res_%s\"",scalarTranspEqVector[iScal].getName());
+    fprintf(fp,"\nZone T = \"residuals\" F = point\n");
     
-    ConvHist_file[0] << " \"MaxPress\" \"MaxPress(KS)\" \"WeightPress(total)\" \"WeightPress(Exit)\" \"WeightPress(Surface)\"";
-    ConvHist_file[0] << " \"SuperVolume\" \"EquivalentRatio\" \"Time(min)\"" << endl;
-    ConvHist_file[0] << "Zone T = \"residuals\" F = point" << endl;
-  }*/
+    fclose(fp);
+  }
 }
 
 void JoeWithModels::writeHistoryFile(double *rhsResid)
 {
-    FILE *fp;
-	char fname[200] = "history.dat";
-	int nScal = scalarTranspEqVector.size();
+  FILE *fp;
+  char fname[200] = "history.dat";
+  int nScal = scalarTranspEqVector.size();
 
-	if (mpi_rank == 0)
-	{
-		if ( (fp = fopen(fname,"a"))== NULL )
-		{
-			cerr << "Error: cannot open file" << fname << endl;
-			throw(-1);
-		}
-		fprintf(fp,"%8d",step);
-		fprintf(fp,"%14.4e%14.4e%14.4e%14.4e%14.4e",
-				log10(rhsResid[0]), log10(rhsResid[1]), log10(rhsResid[2]),
-				log10(rhsResid[3]), log10(rhsResid[4]));
-      
-		for (int iScal = 0; iScal < nScal; iScal++)
-			fprintf(fp,"%14.4e",log10(rhsResid[5 + iScal]));
-      
-		fprintf(fp,"\n");
-		fclose(fp);
+  if (mpi_rank == 0)
+  {
+    if ( (fp = fopen(fname,"a"))== NULL )
+    {
+      cerr << "Error: cannot open file" << fname << endl;
+      throw(-1);
     }
+    fprintf(fp,"%8d",step);
+    fprintf(fp,"%14.4e%14.4e%14.4e%14.4e%14.4e",
+        log10(rhsResid[0]), log10(rhsResid[1]), log10(rhsResid[2]),
+        log10(rhsResid[3]), log10(rhsResid[4]));
+
+    for (int iScal = 0; iScal < nScal; iScal++)
+      fprintf(fp,"%14.4e",log10(rhsResid[5 + iScal]));
+
+    fprintf(fp,"\n");
+    fclose(fp);
+  }
 }
 
 void JoeWithModels::calcJSTCoeff_Const(int iMesh) {
