@@ -1521,7 +1521,7 @@ int UgpWithCvCompFlow::calcEulerFluxMatrices_HAENEL(double (*A_L)[5], double (*A
 void UgpWithCvCompFlow::addViscFlux(double *Frhou, double &FrhoE, double (*A0)[5], double (*A1)[5],
     const double rho0, const double *u0, const double (&grad_u0)[3][3], const double h0, const double *grad_h0, const double T0, const double R0, const double gam0, const double kine0,
     const double rho1, const double *u1, const double (&grad_u1)[3][3], const double h1, const double *grad_h1, const double T1, const double R1, const double gam1, const double kine1,
-    const double mul, const double mut, const double lambdaOverCp, const double kine_fa, const double *u_fa, 
+    const double nonL, const double *rij_d, const double *rij_offd, const double mul, const double mut, const double lambdaOverCp, const double kine_fa, const double *u_fa,
     const double area, const double *nVec, const double smag, const double *sVec)
 {
   double alpha = vecDotVec3d(nVec, sVec);
@@ -1533,10 +1533,10 @@ void UgpWithCvCompFlow::addViscFlux(double *Frhou, double &FrhoE, double (*A0)[5
       grad_u_f[i][j] = 0.5*(grad_u0[i][j] + grad_u1[i][j]);
 
 	
-	double grad_h_f[3];
-	for (int i=0; i<3; i++)
-		for (int j=0; j<3; j++)
-			grad_h_f[i] = 0.5*(grad_h0[i] + grad_h1[i]);
+  double grad_h_f[3];
+  for (int i=0; i<3; i++)
+    for (int j=0; j<3; j++)
+      grad_h_f[i] = 0.5*(grad_h0[i] + grad_h1[i]);
 
   double fCorr[3] = { nVec[0] - alpha*sVec[0], 
                       nVec[1] - alpha*sVec[1],
@@ -1548,39 +1548,89 @@ void UgpWithCvCompFlow::addViscFlux(double *Frhou, double &FrhoE, double (*A0)[5
   // ========================================================================
 
   double muTotalMomentum = mul + mut;
-  double tauij_nj[3], enth;
+  double tauij_nj[3], tauLamij_nj[3], tauTurbij_nj[3], enth;
+  string SimplexVisc = getStringParam("SIMPLEX_VISCOUS","NO");
+  double tmp;
 
+  // -------------------------------------------------------------------------
+  // Laminar fluxes
+  // -------------------------------------------------------------------------
 
-	string SimplexVisc = getStringParam("SIMPLEX_VISCOUS","NO");
-	if (SimplexVisc == "NO") { 
-		for (int i = 0; i < 3; i++)
-		{
-			tauij_nj[i] = muTotalMomentum * (alpha * (u1[i] - u0[i]) / smag
-											 + grad_u_f[i][0] * fCorr[0] + grad_u_f[0][i] * nVec[0]
-											 + grad_u_f[i][1] * fCorr[1] + grad_u_f[1][i] * nVec[1]
-											 + grad_u_f[i][2] * fCorr[2] + grad_u_f[2][i] * nVec[2]);
-		}
-	}
-	else {
-		for (int i = 0; i < 3; i++) {
-			tauij_nj[i] = muTotalMomentum * ((grad_u_f[i][0] + grad_u_f[0][i]) * nVec[0]
-											 + (grad_u_f[i][1] + grad_u_f[1][i]) * nVec[1]
-											 + (grad_u_f[i][2] + grad_u_f[2][i]) * nVec[2]);
-		}
-	}
+  // 2*mul*Sij
+  if (SimplexVisc == "NO")
+  {
+    for (int i = 0; i < 3; i++)
+    {
+      tauLamij_nj[i] = mul * (alpha * (u1[i] - u0[i]) / smag
+                  + grad_u_f[i][0] * fCorr[0] + grad_u_f[0][i] * nVec[0]
+                  + grad_u_f[i][1] * fCorr[1] + grad_u_f[1][i] * nVec[1]
+                  + grad_u_f[i][2] * fCorr[2] + grad_u_f[2][i] * nVec[2]);
+    }
+  }
+  else
+  {
+    for (int i = 0; i < 3; i++)
+    {
+      tauLamij_nj[i] = mul * ((grad_u_f[i][0] + grad_u_f[0][i]) * nVec[0]
+           	    + (grad_u_f[i][1] + grad_u_f[1][i]) * nVec[1]
+		    + (grad_u_f[i][2] + grad_u_f[2][i]) * nVec[2]);
+    }
+  }
 
-	
+  // -2/3*mul*Skk*deltaij
+  tmp = 2.0 / 3.0 * mul * (grad_u_f[0][0] + grad_u_f[1][1] + grad_u_f[2][2]);
 
-  // viscosity times trace of strain rate tensor times 2/3... 
-  double tmp = 2.0 / 3.0 * muTotalMomentum * (grad_u_f[0][0] + grad_u_f[1][1] + grad_u_f[2][2]); 
-  if (turbModel > NONE)
-    tmp += 1.0 / 3.0 * (rho0 + rho1) * kine_fa;  // and 2/3*rho*kine if turb model is on
+  tauLamij_nj[0] -= tmp * nVec[0];
+  tauLamij_nj[1] -= tmp * nVec[1];
+  tauLamij_nj[2] -= tmp * nVec[2];
 
-  tauij_nj[0] -= tmp * nVec[0];
-  tauij_nj[1] -= tmp * nVec[1];
-  tauij_nj[2] -= tmp * nVec[2];
+  // -------------------------------------------------------------------------
+  // turbulent fluxes
+  // -------------------------------------------------------------------------
 
+  // 2*mut*Sij
+  if (SimplexVisc == "NO")
+  {
+    for (int i = 0; i < 3; i++)
+    {
+      tauTurbij_nj[i] = (1.0 - nonL)*mut * (alpha * (u1[i] - u0[i]) / smag
+                  + grad_u_f[i][0] * fCorr[0] + grad_u_f[0][i] * nVec[0]
+                  + grad_u_f[i][1] * fCorr[1] + grad_u_f[1][i] * nVec[1]
+                  + grad_u_f[i][2] * fCorr[2] + grad_u_f[2][i] * nVec[2]);
+    }
+  }
+  else
+  {
+    for (int i = 0; i < 3; i++)
+    {
+      tauTurbij_nj[i] = (1.0 - nonL)*mut * ((grad_u_f[i][0] + grad_u_f[0][i]) * nVec[0]
+                    + (grad_u_f[i][1] + grad_u_f[1][i]) * nVec[1]
+                    + (grad_u_f[i][2] + grad_u_f[2][i]) * nVec[2]);
+    }
+  }
+
+  // -2/3*mut*Skk*deltaij
+  tmp = (1.0 - nonL) * 2.0 / 3.0 * mut * (grad_u_f[0][0] + grad_u_f[1][1] + grad_u_f[2][2]);
+  // -2/3*rho*k (only for turb models)
+  if (turbModel > NONE) tmp += (1.0 - nonL) * 1.0 / 3.0 * (rho0 + rho1) * kine_fa;
+
+  tauTurbij_nj[0] -= tmp * nVec[0];
+  tauTurbij_nj[1] -= tmp * nVec[1];
+  tauTurbij_nj[2] -= tmp * nVec[2];
+
+  // Reynolds stresses
+  tauTurbij_nj[0] += nonL*(rij_d[0]    * nVec[0] + rij_offd[0] * nVec[1] + rij_offd[1] * nVec[2]);
+  tauTurbij_nj[1] += nonL*(rij_offd[0] * nVec[0] + rij_d[1]    * nVec[1] + rij_offd[2] * nVec[2]);
+  tauTurbij_nj[2] += nonL*(rij_offd[1] * nVec[0] + rij_offd[2] * nVec[1] + rij_d[2]    * nVec[2]);
+
+  // -------------------------------------------------------------------------
   // subtract from momentum flux (require LHS form - see convective term above)...
+  // -------------------------------------------------------------------------
+
+  tauij_nj[0] = tauLamij_nj[0] + tauTurbij_nj[0];
+  tauij_nj[1] = tauLamij_nj[1] + tauTurbij_nj[1];
+  tauij_nj[2] = tauLamij_nj[2] + tauTurbij_nj[2];
+
   Frhou[0] = -area * tauij_nj[0];
   Frhou[1] = -area * tauij_nj[1];
   Frhou[2] = -area * tauij_nj[2];
@@ -1607,7 +1657,7 @@ void UgpWithCvCompFlow::addViscFlux(double *Frhou, double &FrhoE, double (*A0)[5
   // model for triple correlation
   double psi = 0.0;
   if (turbModel > NONE)
-    psi = muTotalMomentum * (alpha * (kine1 - kine0) / smag);
+    psi = (mul + mut) * (alpha * (kine1 - kine0) / smag);
 
 
   FrhoE = -area * (enth + tauij_nj[0] * u_fa[0] + tauij_nj[1] * u_fa[1] + tauij_nj[2] * u_fa[2] + psi);
@@ -1625,17 +1675,17 @@ void UgpWithCvCompFlow::addViscFlux(double *Frhou, double &FrhoE, double (*A0)[5
   if (A0 != NULL)
   {
     // d(fx)/duvw
-    dfdU[1][1] = - muTotalMomentum * alpha / smag * area;
+    dfdU[1][1] = - (mul + mut) * alpha / smag * area;
     dfdU[1][2] = 0.0;
     dfdU[1][3] = 0.0;
     // d(fy)/duvw
     dfdU[2][1] = 0.0;
-    dfdU[2][2] = - muTotalMomentum * alpha / smag * area;
+    dfdU[2][2] = - (mul + mut) * alpha / smag * area;
     dfdU[2][3] = 0.0;
     // d(fz)/duvw
     dfdU[3][1] = 0.0;
     dfdU[3][2] = 0.0;
-    dfdU[3][3] = - muTotalMomentum * alpha / smag * area;
+    dfdU[3][3] = - (mul + mut) * alpha / smag * area;
   
     // d(fE)/duvwTemp
     dfdU[4][1] = area * tauij_nj[0] * 0.5 + u_fa[0] * dfdU[1][1];
@@ -1671,17 +1721,17 @@ void UgpWithCvCompFlow::addViscFlux(double *Frhou, double &FrhoE, double (*A0)[5
   // ========================================================================
   if (A1 != NULL)
   {
-    dfdU[1][1] = muTotalMomentum * alpha / smag * area;
+    dfdU[1][1] = (mul + mut) * alpha / smag * area;
     dfdU[1][2] = 0.0;
     dfdU[1][3] = 0.0;
   
     dfdU[2][1] = 0.0;
-    dfdU[2][2] = muTotalMomentum * alpha / smag * area;
+    dfdU[2][2] = (mul + mut) * alpha / smag * area;
     dfdU[2][3] = 0.0;
   
     dfdU[3][1] = 0.0;
     dfdU[3][2] = 0.0;
-    dfdU[3][3] = muTotalMomentum * alpha / smag * area;
+    dfdU[3][3] = (mul + mut) * alpha / smag * area;
 
     dfdU[4][1] = area * tauij_nj[0] * 0.5 + u_fa[0] * dfdU[1][1];
     dfdU[4][2] = area * tauij_nj[1] * 0.5 + u_fa[1] * dfdU[2][2];

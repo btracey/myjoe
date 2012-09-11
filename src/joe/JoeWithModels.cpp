@@ -3382,7 +3382,7 @@ void JoeWithModels::calcViscousFluxNS(double *rhs_rho, double (*rhs_rhou)[3], do
     addViscFlux(Frhou, FrhoE, A0, A1,
               rho[icv0], vel[icv0], grad_u[icv0], enthalpy[icv0], grad_enthalpy[icv0], temp[icv0], RoM[icv0], gamma[icv0], kine0,
               rho[icv1], vel[icv1], grad_u[icv1], enthalpy[icv1], grad_enthalpy[icv1], temp[icv1], RoM[icv1], gamma[icv1], kine1,
-              mul_fa[ifa], mut_fa[ifa], lamOcp_fa[ifa], kine_fa, uAux_fa,
+              nonLinear[ifa], rij_diag_fa[ifa], rij_offdiag_fa[ifa], mul_fa[ifa], mut_fa[ifa], lamOcp_fa[ifa], kine_fa, uAux_fa,
               area, nVec, smag, sVec);
 
     if (flagImplicit)
@@ -3482,7 +3482,7 @@ void JoeWithModels::calcViscousFluxNS(double *rhs_rho, double (*rhs_rhou)[3], do
             addViscFlux(Frhou, FrhoE, A0, NULL,
                       rho[icv0],    vel[icv0],    grad_u[icv0], enthalpy[icv0], grad_enthalpy[icv0], temp[icv0], RoM[icv0],    gamma[icv0],  kine0,
                       rho_bfa[ifa], vel_bfa[ifa], grad_u[icv0], h_bfa[ifa],     grad_enthalpy[icv0], T_bfa[ifa], RoM_bfa[ifa], gam_bfa[ifa], kine1,
-                      mul_fa[ifa], 0.0, lamOcp_fa[ifa], kine_fa, vel_bfa[ifa],
+                      nonLinear[ifa], rij_diag_fa[ifa], rij_offdiag_fa[ifa], mul_fa[ifa], 0.0, lamOcp_fa[ifa], kine_fa, vel_bfa[ifa],
                       area, nVec, smag, nVec);  /* <- use nVec here instead of sVec, to avoid inaccurate correction*/
 
             if (flagImplicit)
@@ -3531,7 +3531,7 @@ void JoeWithModels::calcViscousFluxNS(double *rhs_rho, double (*rhs_rhou)[3], do
             addViscFlux(Frhou, FrhoE, A0, NULL,
                       rho[icv0],    vel[icv0],    grad_u[icv0], enthalpy[icv0], grad_enthalpy[icv0], temp[icv0], RoM[icv0],    gamma[icv0],  kine0,
                       rho_bfa[ifa], vel_bfa[ifa], grad_u[icv0], h_bfa[ifa],     grad_enthalpy[icv0], T_bfa[ifa], RoM_bfa[ifa], gam_bfa[ifa], kine1,
-                      mul_fa[ifa], mut_fa[ifa], lamOcp_fa[ifa], kine_fa, vel_bfa[ifa],
+                      nonLinear[ifa], rij_diag_fa[ifa], rij_offdiag_fa[ifa], mul_fa[ifa], mut_fa[ifa], lamOcp_fa[ifa], kine_fa, vel_bfa[ifa],
                       area, nVec, smag, sVec);
 
             if (flagImplicit)

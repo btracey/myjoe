@@ -113,8 +113,11 @@ public:   // constructors/destructors
     massFlux_fa = NULL;
 
     // turbulence 
-    mut_fa = NULL;          // defined at faces, allocated in initializeFromRestartFile
-    kine   = NULL;          // registerScalar(kine, "kine", CV_DATA);
+    mut_fa          = NULL;     // defined at faces, allocated in initializeFromRestartFile
+    kine            = NULL;     // registerScalar(kine, "kine", CV_DATA);
+    nonLinear       = NULL;
+    rij_diag_fa     = NULL;
+    rij_offdiag_fa  = NULL;
     rij_diag        = NULL;     registerVector(rij_diag,        "rij_diag",        CV_DATA);
     rij_offdiag     = NULL;     registerVector(rij_offdiag,     "rij_offdiag",     CV_DATA);
 
@@ -530,6 +533,17 @@ public:   // constructors/destructors
     mul_fa    = new double[nfa];
     lamOcp_fa = new double[nfa];
     
+    nonLinear      = new double[nfa];
+    rij_diag_fa    = new double[nfa][3];
+    rij_offdiag_fa = new double[nfa][3];
+
+    for (int ifa = 0; ifa < nfa; ifa++)
+    {
+      nonLinear[ifa]         = 0.0;
+      rij_diag_fa[ifa][0]    = rij_diag_fa[ifa][1]    = rij_diag_fa[ifa][2]    = 0.0;
+      rij_offdiag_fa[ifa][0] = rij_offdiag_fa[ifa][1] = rij_offdiag_fa[ifa][2] = 0.0;
+    }
+
     // ----------------------------------------------------------------------------------------
     // init memory for scalar diffusion coeff
     // ----------------------------------------------------------------------------------------
@@ -583,6 +597,10 @@ public:   // constructors/destructors
     if (mul_fa      != NULL)       {delete [] mul_fa;            mul_fa      = NULL;}
     if (lamOcp_fa   != NULL)       {delete [] lamOcp_fa;         lamOcp_fa   = NULL;}
 
+    if (nonLinear      != NULL)    {delete [] nonLinear;         nonLinear   = NULL;}
+    if (rij_diag_fa    != NULL)    {delete []rij_diag_fa;            rij_diag_fa    = NULL;}
+    if (rij_offdiag_fa != NULL)    {delete []rij_offdiag_fa;         rij_offdiag_fa = NULL;}
+
     for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
     {
       if (data->phi_bfa     != NULL)     {delete [] data->phi_bfa;            data->phi_bfa     = NULL;}
@@ -628,11 +646,13 @@ public:   // member variables
   double *mul_fa;           ///< laminar viscosity at cell faces
   double *lamOcp_fa;        ///< heat conductivity at cell faces
   
-  double *mut_fa;           ///< turbulent viscosity at cell faces
-  double *kine;     
-  double (*rij_diag)[3];    ///< diagonal Reynolds stresses at cel center from ASBM
-  double (*rij_offdiag)[3]; ///< off diagonal Reynolds stresses at cel center from ASBM
-  //  double *kine, *eps;         ///< turbulent kinetic energy and turbulent dissipation 
+  double *mut_fa;              ///< turbulent viscosity at cell faces
+  double *kine;
+  double *nonLinear;           ///< 0 if Boussinesq, 1 if non-linear model (in between values allowed).
+  double (*rij_diag_fa)[3];    ///< diagonal Reynolds stresses at faces
+  double (*rij_offdiag_fa)[3]; ///< off diagonal Reynolds stresses at faces
+  double (*rij_diag)[3];       ///< diagonal Reynolds stresses at cel center
+  double (*rij_offdiag)[3];    ///< off diagonal Reynolds stresses at cel center
 
   double *massFlux_fa;      ///< mass flux for scalar solver
 
@@ -1159,7 +1179,7 @@ public:   // member functions
   virtual void addViscFlux(double *Frhou, double &FrhoE, double (*A0)[5], double (*A1)[5],
       const double rho0, const double *u0, const double (&grad_u0)[3][3], const double h0, const double *grad_h0, const double T0, const double R0, const double gam0, const double kine0,
       const double rho1, const double *u1, const double (&grad_u1)[3][3], const double h1, const double *grad_h1, const double T1, const double R1, const double gam1, const double kine1,
-      const double mul, const double mut, const double lambdaOverCp, const double kine_fa, const double *u_fa, 
+      const double nonL, const double *rij_d, const double *rij_offd, const double mul, const double mut, const double lambdaOverCp, const double kine_fa, const double *u_fa,
       const double area, const double *nVec, const double smag, const double *sVec);
   
   
