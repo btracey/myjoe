@@ -5,6 +5,7 @@
 #include "turbModels/TurbModel_KOMSST.h"
 #include "turbModels/TurbModel_SA.h"
 #include "turbModels/TurbModel_V2F.h"
+#include "turbModels/TurbModel_ASBM.h"
 #include "turbModels/TransModel_GaReT.h"
 
 
@@ -274,17 +275,33 @@ public:
 
   virtual ~MyJoeV2F() {}
 };
+
+/*
+ * MyJoe with ASBM model
+ */
+class MyJoeASBM : public MyJoe, public RansTurbASBM
+{
+public:
+  MyJoeASBM(char *name) : MyJoe(name), UgpWithCvCompFlow(name)
+  {
+    if (mpi_rank == 0)
+      cout << "MyJoeASBM()" << endl;
+  }
+
+  virtual ~MyJoeASBM() {}
+};
+
 /*
  * Flat channel with periodic bc's, SST
  */
-class PerChanSST: public MyJoeSST{
+class PerChanSST: public MyJoeASBM{
 protected:
   int    nn;             // number of nodes in input profile
   int    nval;           // number of variables in input profile
   double **boundVal;     // holder for input profile data
 
 public:
-  PerChanSST(char *name) : MyJoeSST(name), UgpWithCvCompFlow(name)
+  PerChanSST(char *name) : MyJoeASBM(name), UgpWithCvCompFlow(name)
   {
     if (mpi_rank == 0) cout << "PerChanSST()" << endl;
     boundVal = NULL;

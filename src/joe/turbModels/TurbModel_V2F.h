@@ -74,7 +74,6 @@ public:
   double *eps, *v2, *f;                                 ///< turbulent scalars, introduced to have access to variables, results in to more readable code
   double *kine_bfa, *eps_bfa, *v2_bfa, *f_bfa;          ///< turbulent scalars at the boundary
   double *muT;                                          ///< turbulent viscosity at cell center for output
-  double *turbTS, *turbLS;
   
   double C_MU, SIG_K, SIG_D, CEPS1, CEPS2, C1, C2, CETA, CL, ALPHA, ENN;
 
@@ -84,7 +83,7 @@ public:
   virtual void initialHookScalarRansTurbModel()
   {
     if (mpi_rank == 0) 
-      cout << "initialHook KOM SST model" << endl;
+      cout << "initialHook V2F model" << endl;
 
     ScalarTranspEq *eq;
     eq = getScalarTransportData("kine");     kine = eq->phi;      kine_bfa = eq->phi_bfa;

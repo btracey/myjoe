@@ -115,6 +115,8 @@ public:   // constructors/destructors
     // turbulence 
     mut_fa          = NULL;     // defined at faces, allocated in initializeFromRestartFile
     kine            = NULL;     // registerScalar(kine, "kine", CV_DATA);
+    turbTS          = NULL;
+    turbLS          = NULL;
     nonLinear       = NULL;
     rij_diag_fa     = NULL;
     rij_offdiag_fa  = NULL;
@@ -648,6 +650,8 @@ public:   // member variables
   
   double *mut_fa;              ///< turbulent viscosity at cell faces
   double *kine;
+  double *turbTS;
+  double *turbLS;
   double *nonLinear;           ///< 0 if Boussinesq, 1 if non-linear model (in between values allowed).
   double (*rij_diag_fa)[3];    ///< diagonal Reynolds stresses at faces
   double (*rij_offdiag_fa)[3]; ///< off diagonal Reynolds stresses at faces
@@ -1598,6 +1602,7 @@ public:   // member functions
   }
 
   virtual void initialHookScalarRansTurbModel() {/*empty*/}
+  virtual void finalHookScalarRansTurbModel() {/*empty*/}
   virtual void diffusivityHookScalarRansTurb(const string &name)  {/*empty*/}
   virtual void sourceHookScalarRansTurb(double *rhs, double *A, const string &name)  {/*empty*/}
   virtual void sourceHookScalarRansTurbExplicit(double *rhs, const string &name)  {/*empty*/}

@@ -61,6 +61,8 @@ public:   // constructors
     blendFuncF1 = NULL;       registerScalar(blendFuncF1, "blendFuncF1", CV_DATA);
     blendFuncF2 = NULL;       registerScalar(blendFuncF2, "blendFuncF2", CV_DATA);
     wallDist    = NULL;       registerScalar(wallDist, "wallDist",  CV_DATA);
+    turbTS      = NULL;       registerScalar(turbTS, "turbTS", CV_DATA);
+    turbLS      = NULL;       registerScalar(turbLS, "turbLS", CV_DATA);
   }
 
   virtual ~RansTurbKOmSST() {}
@@ -224,7 +226,11 @@ public:   // member functions
     
     // just for output
     for (int icv=0; icv<ncv; icv++)
+    {
       muT[icv] = InterpolateAtCellCenterFromFaceValues(mut_fa, icv);
+      turbTS[icv] = calcTurbTimeScale(kine[icv], omega[icv], strMag[icv], calcMuLam(icv)/rho[icv], 1);
+      turbLS[icv] = calcTurbLengthScale(kine[icv], omega[icv], strMag[icv], calcMuLam(icv)/rho[icv], 1);
+    }
   }
 
   virtual void diffusivityHookScalarRansTurb(const string &name)
@@ -314,6 +320,27 @@ public:   // member functions
           }
       }
     }
+  }
+
+  inline double calcTurbTimeScale(const double &kine, const double &omega,
+                                  const double &str, const double &nu, int realizable)
+  {
+    double eps = betaStar*kine*omega;
+    double TimeScale = max(kine/eps, 2.0*sqrt(nu/eps));  //v2f has 6.0 instead of 2.0
+    if (realizable)
+      TimeScale = min(TimeScale, 1.0/(sqrt(6.0)*betaStar*str)); //this is not consistent with v2f
+    return TimeScale;
+  }
+
+  inline double calcTurbLengthScale(const double &kine, const double &omega,
+                                    const double &str, const double &nu, int realizable)
+  {
+    double CL = 0.23, CETA = 70.0;
+    double eps = betaStar*kine*omega;
+    double LengthScale = CL*max(pow(kine,1.5)/eps, CETA*pow(nu,0.75)/pow(eps,0.25));
+    //if (realizable)            // v2f uses realizable limit
+    //  LengthScale = min(LengthScale, pow(kine,1.5)/(sqrt(3.0)*v2*C_MU*str));
+    return LengthScale;
   }
 
   virtual void sourceHookScalarRansTurb_new(double *rhs, double *A, const string &name, int flagImplicit)

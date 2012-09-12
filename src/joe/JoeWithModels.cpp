@@ -203,6 +203,7 @@ void JoeWithModels::runForwardEuler()
 
   writeRestart();
 
+  finalHookScalarRansTurbModel();
   finalHook();
 
   delete [] drho;
@@ -499,33 +500,33 @@ void JoeWithModels::runRK()
 
     for (int iScal = 0; iScal < nScal; iScal++)
     {
-    	for (int icv = 0; icv < ncv; icv++)
-    		myResidual[5+iScal] += fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
-    		                            + drhoScal3[iScal][icv])/6.0;
+      for (int icv = 0; icv < ncv; icv++)
+        myResidual[5+iScal] += fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
+                                    + drhoScal3[iScal][icv])/6.0;
 
-    	switch (iScal)
-    	{
-    	case 0:
-    		for (int icv = 0; icv < ncv; icv++)
-    			residField0[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
-    			                        + drhoScal3[iScal][icv])/6.0;
-    		break;
-    	case 1:
-    		for (int icv = 0; icv < ncv; icv++)
-    			residField1[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
-    					                + drhoScal3[iScal][icv])/6.0;
-    		break;
-    	case 2:
-    		for (int icv = 0; icv < ncv; icv++)
-    			residField2[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
-    			                        + drhoScal3[iScal][icv])/6.0;
-    		break;
-    	case 3:
-    		for (int icv = 0; icv < ncv; icv++)
-    			residField3[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
-    			                        + drhoScal3[iScal][icv])/6.0;
-    		break;
-    	}
+      switch (iScal)
+      {
+      case 0:
+        for (int icv = 0; icv < ncv; icv++)
+          residField0[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
+    			          + drhoScal3[iScal][icv])/6.0;
+        break;
+      case 1:
+        for (int icv = 0; icv < ncv; icv++)
+          residField1[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
+    	                         + drhoScal3[iScal][icv])/6.0;
+        break;
+      case 2:
+        for (int icv = 0; icv < ncv; icv++)
+          residField2[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
+    	                         + drhoScal3[iScal][icv])/6.0;
+        break;
+      case 3:
+        for (int icv = 0; icv < ncv; icv++)
+          residField3[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
+    	                         + drhoScal3[iScal][icv])/6.0;
+        break;
+      }
     }
 
     MPI_Allreduce(myResidual, Residual, 5+nScal, MPI_DOUBLE, MPI_SUM, mpi_comm);
@@ -554,6 +555,7 @@ void JoeWithModels::runRK()
 
   writeRestart();
 
+  finalHookScalarRansTurbModel();
   finalHook();
 
   delete [] drho1;
@@ -781,17 +783,17 @@ void JoeWithModels::runBackwardEuler()
       switch (iScal)
       {
       case 0:
-    	  for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhsScal[iScal][icv];
-    	  break;
+        for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhsScal[iScal][icv];
+        break;
       case 1:
-    	  for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhsScal[iScal][icv];
-    	  break;
+        for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhsScal[iScal][icv];
+        break;
       case 2:
-    	  for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhsScal[iScal][icv];
-    	  break;
+        for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhsScal[iScal][icv];
+        break;
       case 3:
-    	  for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhsScal[iScal][icv];
-    	  break;
+        for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhsScal[iScal][icv];
+        break;
       }
 
       solveLinSysScalar(dScal[iScal], AScal[iScal][5], rhsScal[iScal],
@@ -887,6 +889,7 @@ void JoeWithModels::runBackwardEuler()
   // ---------------------------------------------------------------------------------
 
   temporalHook();
+  finalHookScalarRansTurbModel();
   finalHook();
 	
   writeRestart();
@@ -1304,6 +1307,7 @@ void JoeWithModels::runBDF2()
   // ---------------------------------------------------------------------------------
 
   temporalHook();
+  finalHookScalarRansTurbModel();
   finalHook();
 
   writeRestart();
@@ -1779,6 +1783,7 @@ void JoeWithModels::runBDF2SemiCoupled()
 	// ---------------------------------------------------------------------------------
 	
 	temporalHook();
+	finalHookScalarRansTurbModel();
 	finalHook();
 	
 	writeRestart();
@@ -4113,6 +4118,7 @@ void JoeWithModels::runBackwardEulerCoupled()
   // ---------------------------------------------------------------------------------
 
   temporalHook();
+  finalHookScalarRansTurbModel();
   finalHook();
 
   writeRestart();
@@ -5718,6 +5724,7 @@ void JoeWithModels::runBackwardEulerSemiCoupled()
   // ---------------------------------------------------------------------------------
 
   temporalHook();
+  finalHookScalarRansTurbModel();
   finalHook();
 
   writeRestart();
