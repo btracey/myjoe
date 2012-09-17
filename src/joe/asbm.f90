@@ -14,7 +14,7 @@
 !
 !==============================================================================80
 
-  subroutine asbm(st, wt, wft, bx, by, bz, as, ar, rey, dmn, cir, ktrmax, ierr)
+  subroutine asbm(st, wt, wft, bl, as, ar, rey, dmn, cir, ktrmax, ierr)
     implicit none
     integer, parameter  :: dp = selected_real_kind(15, 307) !double precision
 
@@ -23,9 +23,7 @@
     real(dp), dimension(3,3), intent(in)    :: st  !(Rate of strain)*timescale
     real(dp), dimension(3,3), intent(in)    :: wt  !(Mean rotation)*timescale
     real(dp), dimension(3,3), intent(in)    :: wft !(Frame rotation)*timescale
-    real(dp), dimension(3,3), intent(in)    :: bx  !x based wall blocking
-    real(dp), dimension(3,3), intent(in)    :: by  !y based wall blocking
-    real(dp), dimension(3,3), intent(in)    :: bz  !z based wall blocking
+    real(dp), dimension(3,3), intent(in)    :: bl  !wall blocking tensor
     real(dp), dimension(3,3), intent(inout) :: as  !eddy axis tensor from st
     real(dp), dimension(3,3), intent(inout) :: ar  !eddy axis tensor from st, wt
 
@@ -33,40 +31,40 @@
     real(dp), dimension(3,3), intent(out)   :: dmn  !dimensionality
     real(dp), dimension(3,3), intent(out)   :: cir  !circulicity
 
-    integer, intent(in)    :: ktrmax !max number of iters for Newton-Raphson
-    integer, intent(inout) :: ierr   !return error flag, 0 is okay
+    integer, intent(in)                     :: ktrmax !max iters for N-R
+    integer, intent(inout)                  :: ierr   !error flag
 
     ! constants
-    real(dp), parameter                 :: a0 = 1.4_dp
-    real(dp), parameter                 :: a01 = (2.1_dp - a0) / 2.0_dp
+    real(dp), parameter                     :: a0 = 1.4_dp
+    real(dp), parameter                     :: a01 = (2.1_dp - a0) / 2.0_dp
 
-    real(dp), parameter                   :: zero = 0.0_dp
-    real(dp), parameter                   :: fifth = 0.2_dp
-    real(dp), parameter                   :: fourth = 0.25_dp
-    real(dp), parameter                   :: third = 1.0_dp / 3.0_dp
-    real(dp), parameter                   :: half = 0.5_dp
-    real(dp), parameter                   :: twoth = 2.0_dp*third
-    real(dp), parameter                   :: one = 1.0_dp
-    real(dp), parameter, dimension(3,3)   :: delta =                            &
+    real(dp), parameter                     :: zero = 0.0_dp
+    real(dp), parameter                     :: fifth = 0.2_dp
+    real(dp), parameter                     :: fourth = 0.25_dp
+    real(dp), parameter                     :: third = 1.0_dp / 3.0_dp
+    real(dp), parameter                     :: half = 0.5_dp
+    real(dp), parameter                     :: twoth = 2.0_dp*third
+    real(dp), parameter                     :: one = 1.0_dp
+    real(dp), parameter, dimension(3,3)     :: delta =                          &
          reshape((/1., 0., 0., 0., 1., 0., 0., 0., 1./),(/3,3/))
-    real(dp), parameter, dimension(3,3,3) :: eps =                              &
+    real(dp), parameter, dimension(3,3,3)   :: eps =                            &
          reshape((/0., 0., 0., 0., 0., -1., 0., 1., 0.,                         &
                    0., 0., 1., 0., 0., 0., -1., 0., 0.,                         &
                    0., -1., 0., 1., 0., 0., 0., 0., 0./),(/3,3,3/))
-    real(dp), parameter                   :: a_error = 1.0e-10_dp
-    real(dp), parameter                   :: r_small = 1.0e-14_dp
+    real(dp), parameter                     :: a_error = 1.0e-10_dp
+    real(dp), parameter                     :: r_small = 1.0e-14_dp
     
     ! variables
-    integer                  :: i, j, k, l, m, n 
-    integer                  :: ktr !iteration index for Newton-Raphson
-    integer                  :: id, idx
+    integer                  :: i,j,k,l,m,n   !do loop indices
+    integer                  :: ktr           !iteration index for N-R
+    integer                  :: id, idx       !indeces for N-R vector & matrix
     integer, dimension(3,3)  :: index =                                         & 
       reshape((/1, 2, 3, 2, 4, 5, 3, 5, 6/),(/3, 3/))
 
     logical                  :: strain        !true for strained flows
     logical                  :: rotation      !true for flows with mean rotation
     logical                  :: rotation_t    !true for flows with total rotation
-    logical                  :: converged     !used for Newton-Rhapson
+    logical                  :: converged     !used for N-R solver
     
     real(dp), dimension(3,3) :: a             !eddy axis tensor
     real(dp), dimension(3,3) :: as_old        !input value for as
@@ -83,9 +81,7 @@
     real(dp)                 :: trace_wttwtt  !-wTt_ij*wTt_ji
     real(dp)                 :: trace_aa      !a_ij*a_ji
     real(dp)                 :: trace_ast     !a_ij*st_ji
-    real(dp)                 :: trace_bx      !bx_ii
-    real(dp)                 :: trace_by      !by_ii
-    real(dp)                 :: trace_bz      !bz_ii
+    real(dp)                 :: trace_bl      !bl_ii
     real(dp)                 :: mag_ststa     !sqrt(st_kp*st_kq*a_pq)
     real(dp)                 :: norm_st       !norm of st_ik       
     real(dp)                 :: norm_wt       !norm of wt_ik
@@ -98,8 +94,8 @@
 
     real(dp)                 :: num_as        !numerator for as equation
     real(dp)                 :: den_as        !denominator for as equation
-    real(dp), dimension(6)   :: x_nr          !rhs and sol for Newton-Rhapson
-    real(dp), dimension(6,6) :: a_nr          !matrix for Newton-Rhapson
+    real(dp), dimension(6)   :: x_nr          !rhs and solution for N-R
+    real(dp), dimension(6,6) :: a_nr          !matrix for N-R
     real(dp)                 :: r_ratio       !wt_qr*st_rp*a_pq/st_kn*st_nm*a_mk
     real(dp)                 :: r_abs         !abs(r_ratio)
     real(dp)                 :: r_num         !numerator of r_ratio
@@ -122,10 +118,10 @@
     real(dp)                 :: hat_wtt       !-a_ij*wTt_ik*wTt_kj  
     real(dp)                 :: hat_st        !a_ij*st_ik*st_kj
     real(dp)                 :: hat_x         !a_ij*wTt_ik*st_kj
-    real(dp)                 :: eta_r     
-    real(dp)                 :: eta_f
-    real(dp)                 :: eta_c1
-    real(dp)                 :: eta_c2
+    real(dp)                 :: eta_r         !mean rot over strain parameter
+    real(dp)                 :: eta_f         !frame rot over strain parameter
+    real(dp)                 :: eta_c1        !used to compute eta_r
+    real(dp)                 :: eta_c2        !used to compute eta_f
     real(dp)                 :: oma           !one minus trace_aa
     real(dp)                 :: sqamth        !sqrt(trace_aa - third)
 
@@ -190,7 +186,8 @@
       strain = .true.
       norm_st = sqrt(trace_stst)
     else
-      strain = .false.
+      strain  = .false.
+      norm_st = zero
     end if
 
     if (trace_wtwt > zero) then
@@ -198,6 +195,7 @@
       norm_wt = sqrt(trace_wtwt)
     else
       rotation = .false.
+      norm_wt  = zero
     end if
 
     ! COMPUTE AS
@@ -207,7 +205,7 @@
       a = as
       as_old = as
 
-      ! loop point for Newton-Rhapson iteration
+      ! loop point for Newton-Rhapson (N-R) iteration
       converged = .false.
       ktr = 0
 
@@ -334,11 +332,6 @@
     ! update as
     as = a
 
-!!$    write(*,*) 'A'
-!!$    write(*,*) A(1,1), A(1,2), A(1,3)
-!!$    write(*,*) A(2,1), A(2,2), A(2,3)
-!!$    write(*,*) A(3,1), A(3,2), A(3,3)
-
     ! COMPUTE AR
     ! check for rotation
     purerotation: if (rotation) then
@@ -346,7 +339,7 @@
       a = ar
       ar_old = ar
      
-      ! loop point for Newton-Rhapson iteration
+      ! loop point for Newton-Rhapson (N-R) iteration
       converged = .false.
       ktr = 0
 
@@ -368,21 +361,21 @@
         end if
 
         ! compute rotation parameters
+        trace_wtsta = zero
+        trace_ststa = zero
+        do i = 1,3
+          do j = 1,3
+            trace_wtsta = trace_wtsta + a(i,j)*wtst(j,i)
+            trace_ststa = trace_ststa + stst(i,j)*a(j,i)
+          end do
+        end do
+
         if (ktr == 1) then
-          ! first trial relative rotation parameter
+          ! relative rotation parameter for first trial
           r_ratio = one
         else
-          trace_wtsta = zero
-          trace_ststa = zero
-          do i = 1,3
-            do j = 1,3
-              trace_wtsta = trace_wtsta + a(i,j)*wtst(j,i)
-              trace_ststa = trace_ststa + stst(i,j)*a(j,i)
-            end do
-          end do
-          r_ratio = trace_wtsta/trace_ststa
-       
-          ! check for no effective rotation
+          ! relative rotation parameter for following trials
+          r_ratio = trace_wtsta/trace_ststa      
           if (abs(r_ratio) < r_small) exit
         end if
         r_abs = abs(r_ratio)
@@ -408,27 +401,6 @@
         c2 = alpha/norm_wt
         c3 = beta/trace_wtwt
         
-        ! coefficients in the a_nr matrix
-        if (ktr > 1) then
-          coefa = fourth/(aroot*alpha*norm_wt)
-          coefb = half/(aroot*broot*trace_wtwt)
-
-          if (r_abs < one) then
-            coefa = coefa*r_ratio
-            coefb = coefb*r_ratio
-          else
-            coefa = coefa/r_ratio
-            coefb = coefb/r_ratio
-          end if
-
-          ! p(k,l) for nr calculation
-          do k = 1,3
-            do l = 1,3
-              p(k,l) = wtst(k,l)/trace_wtsta - stst(k,l)/trace_ststa
-            end do
-          end do
-        end if
-
         ! compute rotation matrix h
         do i = 1,3
           do j = 1,3
@@ -464,6 +436,25 @@
           ! done for the first trial
           cycle
         end if
+
+        ! coefficients in the a_nr matrix 
+        coefa = fourth/(aroot*alpha*norm_wt)
+        coefb = half/(aroot*broot*trace_wtwt)
+        
+        if (r_abs < one) then
+          coefa = coefa*r_ratio
+          coefb = coefb*r_ratio
+        else
+          coefa = coefa/r_ratio
+          coefb = coefb/r_ratio
+        end if
+
+        ! p(k,l) for nr calculation
+        do k = 1,3
+          do l = 1,3
+            p(k,l) = wtst(k,l)/trace_wtsta - stst(k,l)/trace_ststa
+          end do
+        end do    
 
         ! finish x_nr and compute a_nr
         do i = 1,3
@@ -581,17 +572,17 @@
 
     ! COMPUTE STRUTURE SCALARS
     trace_wttwtt = zero
-    trace_ststa = zero
-    trace_aa = zero
-    trace_ast = zero
+    trace_ststa  = zero
+    trace_aa     = zero
+    trace_ast    = zero
     
     do i = 1,3
       do j = 1,3
-        wtt(i,j) = wft(i,j) + wt(i,j)
+        wtt(i,j)     = wft(i,j) + wt(i,j)
         trace_wttwtt = trace_wttwtt + wtt(i,j)*wtt(i,j)
-        trace_ststa = trace_ststa + a(i,j)*stst(i,j)
-        trace_aa = trace_aa + a(i,j)*a(j,i)
-        trace_ast = trace_ast + a(i,j)*st(j,i)
+        trace_ststa  = trace_ststa + a(i,j)*stst(i,j)
+        trace_aa     = trace_aa + a(i,j)*a(j,i)
+        trace_ast    = trace_ast + a(i,j)*st(j,i)
       end do
     end do
 
@@ -622,18 +613,18 @@
     dot_vec_wdt = vec_wdt(1)**2.0_dp + vec_wdt(2)**2.0_dp + vec_wdt(3)**2.0_dp
 
     ! compute quantities based on total rotation rate
-    hat_wt = zero        
+    hat_wt  = zero        
     hat_wtt = zero 
-    hat_st = zero                
-    hat_x = zero  
+    hat_st  = zero                
+    hat_x   = zero  
        
     do i = 1,3
       do j = 1,3
         do k = 1,3
-          hat_wt = hat_wt + a(i,j)*wt(i,k)*wt(j,k)
+          hat_wt  = hat_wt + a(i,j)*wt(i,k)*wt(j,k)
           hat_wtt = hat_wtt + a(i,j)*wtt(i,k)*wtt(j,k)
-          hat_st = hat_st + a(i,j)*st(i,k)*st(j,k)
-          hat_x = hat_x + a(i,j)*wtt(j,k)*st(k,i)
+          hat_st  = hat_st + a(i,j)*st(i,k)*st(j,k)
+          hat_x   = hat_x + a(i,j)*wtt(j,k)*st(k,i)
         end do
       end do
     end do
@@ -688,9 +679,8 @@
       else 
         call int_er_gt_one(eta_r,eta_f,oma,sqamth,phis,bets,chis,phi1,bet1,chi1)
       end if
-
       struc_weight = exp(-1000.0_dp*abs(eta_r - one)**2.0_dp)
-      phis = phis*(1 - struc_weight) + phi1*(struc_weight)
+      !phis = phis*(1 - struc_weight) + phi1*(struc_weight)
       bets = bets*(1 - struc_weight) + bet1*(struc_weight)
       chis = chis*(1 - struc_weight) + chi1*(struc_weight)
     end if
@@ -701,49 +691,35 @@
 
     phi = phis*xp_aa
     chi = chis*xp_aa
-    bet = bets
+    if (eta_r < one) then
+      bet = bets
+    else
+      bet = one - max(one - 0.9_dp*(eta_r - one)**0.31_dp, zero)*               &
+                  (1.5_dp*(trace_aa - third))**10.0_dp
+      !a(1,2) = a(1,2)*(one - 1.5_dp*(trace_aa - third))**0.1_dp
+      !a(2,1) = a(1,2)
+    end if
     
     ! compute helical scalar
     scl_g = 2.0_dp*phi*(one - phi)/(one + chi)
     if (scl_g < zero) scl_g = zero
     scl_g = bet*sqrt(scl_g)
 
-    if (rotation_t) then
-    ! compute helical vector
-      do k = 1,3
-        vec_g(k) = -vec_wtt(k)/mag_vec_wtt
-      end do
-    else
-      do k = 1,3
-        vec_g(k) = zero
-      end do
-    end if
-
     ! IMPOSE BLOCKAGE MODIFICATIONS
     ! blockage correction to eddy-axis tensor
-    call blocking(a,bx,by,bz,delta,ierr)
+    call blocking(a,bl,delta,ierr)
 
     ! blockage correction to phi and gamma
-    trace_bx = bx(1,1) + bx(2,2) + bx(3,3)
-    trace_by = by(1,1) + by(2,2) + by(3,3)
-    trace_bz = bz(1,1) + bz(2,2) + bz(3,3)
+    trace_bl = bl(1,1) + bl(2,2) + bl(3,3)
 
-    phi = one - (one - trace_bx)**2 + phi*(one - trace_bx)**2
-    scl_g = (one - trace_bx)*scl_g
-    chi = (one - trace_bx)*chi
-    
-    phi = one - (one - trace_by)**2 + phi*(one - trace_by)**2
-    scl_g = (one - trace_by)*scl_g
-    chi = (one - trace_by)*chi
-
-    phi = one - (one - trace_bz)**2 + phi*(one - trace_bz)**2
-    scl_g = (one - trace_bz)*scl_g
-    chi = (one - trace_bz)*chi
+    phi = one - (one - trace_bl)**2 + phi*(one - trace_bl)**2
+    scl_g = (one - trace_bl)*scl_g
+    !chi = (one - trace_bl)*chi
     
     if (rotation_t) then
     ! compute helical vector
       do k = 1,3
-        vec_g(k) = -vec_wtt(k)/mag_vec_wtt
+        vec_g(k) = -scl_g*vec_wtt(k)/mag_vec_wtt
       end do
     else
       do k = 1,3
@@ -752,7 +728,7 @@
     end if
 
     ! COMPUTE STRUCTURE TENSORS
-    call structure(rey, dmn, cir, a, phi, chi, scl_g, vec_g, vec_wdt,           &
+    call structure(rey, dmn, cir, a, phi, chi, vec_g, vec_wdt,           &
                    dot_vec_wdt, rotation_t, delta, eps, ierr)
 
     ! Output some useful data
@@ -771,7 +747,6 @@
 ! Solves a(i,j)*x(j) = b(i) i = 1,...,n
 ! fround is a round-off test factor assuming at least 15 digit accuracy.
 ! Uses Gaussian elimination with row normalization and selection.
-! ndim is the dimension of the a and v arrays.
 ! On return:
 !   Solution ok:
 !     ierr = 0
@@ -789,22 +764,23 @@
 
     ! INITIAL DECLARATIONS
     ! routine's inputs and outputs
-    integer, intent(in)                           :: ndim
-    integer, intent(in)                           :: n
-    integer, intent(inout)                        :: ierr
-    real(dp), dimension(ndim,ndim), intent(inout) :: a
-    real(dp), dimension(ndim), intent(inout)      :: b
+    integer, intent(in)                           :: ndim   !number of columns
+    integer, intent(in)                           :: n      !number of rows
+    integer, intent(inout)                        :: ierr   !error flag
+    real(dp), dimension(ndim,ndim), intent(inout) :: a      !matrix
+    real(dp), dimension(ndim), intent(inout)      :: b      !vector  
     
     ! constants
-    real(dp), parameter                 :: zero = 0.0_dp
-    real(dp), parameter                 :: one = 1.0_dp
-    real(dp), parameter                 :: fround = 1.0e-15_dp
+    real(dp), parameter :: zero = 0.0_dp
+    real(dp), parameter :: one = 1.0_dp
+    real(dp), parameter :: fround = 1.0e-15_dp
 
     ! variables
-    integer                      :: i, j, k
-    integer                      :: ix, nm1, m, mm1, im1
-    real(dp)                     :: c, cx, d
-    real(dp)                     :: termb, term
+    integer             :: i, j, k
+    integer             :: ix = 0.0_dp 
+    integer             :: nm1, m, mm1, im1
+    real(dp)            :: c, cx, d
+    real(dp)            :: termb, term
 
     continue
 
@@ -956,19 +932,19 @@
     real(dp), intent(inout) :: chi1
 
     ! constants
-    real(dp), parameter :: zero = 0.0_dp
-    real(dp), parameter :: one = 1.0_dp
+    real(dp), parameter     :: zero = 0.0_dp
+    real(dp), parameter     :: one = 1.0_dp
     
     ! variables
-    real(dp) :: eta_f1, eta_f0
-    real(dp) :: phi0
-    real(dp) :: bet0
-    real(dp) :: chi0
-    real(dp) :: param 
+    real(dp)                :: eta_f1, eta_f0
+    real(dp)                :: phi0
+    real(dp)                :: bet0
+    real(dp)                :: chi0
+    real(dp)                :: param 
     
     continue
 
-    param = 4.0_dp/sqrt(3.0_dp)
+    param = sqrt(3.0_dp)/4.0_dp
     if (eta_f < (param*(eta_r - one))) then 
       eta_f1 = eta_f - param*(eta_r - one)
       eta_f0 = eta_f - param*(eta_r - one) - param
@@ -991,9 +967,10 @@
     call plane_strain(eta_f0,oma,sqamth,phi0,bet0,chi0)
     
     ! interpolate along eta_r direction
-    phis = phi0 + (phi1 - phi0)*eta_r**2.0_dp
+    phis = phi0 + (phi1 - phi0)*                                                &
+                  (0.82_dp*eta_r**2)/(one - (one-0.82_dp)*eta_r**2)
     bets = bet0 + (bet1 - bet0)*eta_r**2.0_dp
-    chis = chi0 + (chi1 - chi0)*eta_r**4.0_dp
+    chis = chi0 + (chi1 - chi0)*eta_r**2.0_dp
   
   end subroutine int_er_lt_one
 
@@ -1022,21 +999,24 @@
     real(dp), intent(inout) :: chi1
 
     ! constants
-    real(dp), parameter :: third = 1.0_dp / 3.0_dp
-    real(dp), parameter :: one = 1.0_dp
+    real(dp), parameter     :: third = 1.0_dp / 3.0_dp
+    real(dp), parameter     :: half = 1.0_dp / 2.0_dp
+    real(dp), parameter     :: one = 1.0_dp
 
     ! variables
-    real(dp) :: aux
+    real(dp)                :: aux
+    real(dp)                :: aux_shift
 
     continue
 
-    aux = one/(one + (eta_r - one)/oma)
+    aux = one/(one + half*(eta_r - one)/(oma)**2.5_dp)
+    aux_shift = one/(one + half*(eta_r - one)/(oma+third)**2.5_dp)
 
     ! compute parameters for shear state
     call pure_shear(eta_f,oma,sqamth,phi1,bet1,chi1)
     
     ! extrapolate along eta_r direction
-    phis = third + (phi1 - third)*aux
+    phis = third + (phi1 - third)*aux_shift
     bets = bet1*aux
     chis = chi1*aux
   
@@ -1062,19 +1042,20 @@
     real(dp), intent(inout) :: chi1
 
     ! constants
-    real(dp), parameter :: zero = 0.0_dp
-    real(dp), parameter :: half = 0.5_dp
-    real(dp), parameter :: one = 1.0_dp
+    real(dp), parameter     :: zero = 0.0_dp
+    real(dp), parameter     :: fifth = 0.2_dp
+    real(dp), parameter     :: one = 1.0_dp
 
     continue
 
     if (eta_f < zero) then
       phi1 = (eta_f - one)/(3.0_dp*eta_f - one)
       bet1 = one/(one - eta_f*(1 + sqamth)/oma)
-      chi1 = half*bet1
+      chi1 = fifth*bet1
     else if (eta_f < one) then
-      phi1 = (one - eta_f)
-      chi1 = half + half*(one - (one - eta_f)**2/(one + 100.0_dp*eta_f/oma))
+      phi1 = one - eta_f
+      chi1 = fifth + (one - fifth)*                                             &
+                     (one - (one - eta_f)**2/(one + 3.0_dp*eta_f/oma))
       bet1 = one
     else
       phi1 = (eta_f - one)/(3.0_dp*eta_f - one)
@@ -1104,14 +1085,14 @@
     real(dp), intent(inout) :: chi0
 
     ! constants
-    real(dp), parameter :: zero = 0.0_dp
-    real(dp), parameter :: one = 1.0_dp
-    real(dp), parameter :: two = 2.0_dp
-    real(dp), parameter :: three = 3.0_dp
+    real(dp), parameter     :: zero = 0.0_dp
+    real(dp), parameter     :: one = 1.0_dp
+    real(dp), parameter     :: two = 2.0_dp
+    real(dp), parameter     :: three = 3.0_dp
 
     ! variables
-    real(dp) :: var1
-    real(dp) :: var2
+    real(dp)                :: var1
+    real(dp)                :: var2
 
     continue
     
@@ -1136,170 +1117,86 @@
 ! Modifies the eddy axis tensor to account for wall effects.
 ! Input:
 !        a(i,j)       unblocked (homogeneous) tensor
-!        bx(i,j)      x blocking tensor
-!        by(i,j)      y blocking tensor
-!        bz(i,j)      z blocking tensor
+!        bl(i,j)      blocking tensor
 ! Output
 !        a(i,j)       blocked tensor
 !
 !==============================================================================80
 
-  subroutine blocking(a,bx,by,bz,delta,ierr)
+  subroutine blocking(a,bl,delta,ierr)
     implicit none 
     integer, parameter  :: dp = selected_real_kind(15, 307) !double precision
 
     ! INITIAL DECLARATIONS
     ! routine's inputs and outputs
-    real(dp), dimension(3,3), intent(inout) :: a        !unblocked tensor
-    real(dp), dimension(3,3), intent(in)    :: bx       !x blocking tensor
-    real(dp), dimension(3,3), intent(in)    :: by       !y blocking tensor
-    real(dp), dimension(3,3), intent(in)    :: bz       !z blocking tensor
+    real(dp), dimension(3,3), intent(inout) :: a        !eddy axis tensor
+    real(dp), dimension(3,3), intent(in)    :: bl       !blocking tensor
     real(dp), dimension(3,3), intent(in)    :: delta    !kronecker delta
  
-    integer, intent(inout) :: ierr  !error flag
+    integer, intent(inout)                  :: ierr  !error flag
 
     ! constants
-    real(dp) :: small = 1.0e-14_dp
-    real(dp) :: one = 1.0_dp
+    real(dp)                 :: small = 1.0e-14_dp
+    real(dp)                 :: zero = 0.0_dp
+    real(dp)                 :: one = 1.0_dp
 
     ! variables
-    real(dp), dimension(3,3) :: txyz,txzy,tyxz,tyzx,tzxy,tzyx
-    real(dp)                 :: trace_bx, trace_by, trace_bz
+    integer                  :: i,j,k,l    !do loop indeces
+    real(dp), dimension(3,3) :: ah         !homogeneous eddy axis tensor
+    real(dp)                 :: trace_bl   !bl_ii
+    real(dp)                 :: trace_ahbl !ah_in*bl_ni
+    real(dp), dimension(3,3) :: h          !partial projection operator
+    real(dp)                 :: d2         !normalizing factor
+    real(dp)                 :: dinv       !one over sqrt(d2)
+    real(dp)                 :: sum
 
     continue
 
-    trace_bx = bx(1,1) + bx(2,2) + bx(3,3)
-    trace_by = by(1,1) + by(2,2) + by(3,3)
-    trace_bz = bz(1,1) + bz(2,2) + bz(3,3)
+    trace_bl = bl(1,1) + bl(2,2) + bl(3,3)
 
     ! return if no blockage
-    if (trace_bx < small) then
-      if (trace_by < small) then
-        if (trace_bz < small) then
-          return
-        end if
-      end if
-    end if
+    if (trace_bl < small) return
 
     ! check for bad data
-    if (trace_bx > one) then
+    if (trace_bl > one) then
       ierr = 7
       return
     end if
 
-    if (trace_by > one) then
-      ierr = 7
-      return
-    end if
+    ah = a
 
-    if (trace_bz > one) then
-      ierr = 7
-      return
-    end if
+    ! compute normalizing factor
+    sum = zero
+    do i = 1,3
+      do j = 1,3
+        sum = sum + ah(i,j)*bl(i,j)
+      end do
+    end do
+    d2 = one - (2.0_dp - trace_bl)*sum
+    if (d2 < zero) return
+    dinv = one/sqrt(d2);
 
-    ! Initialized blocked tensors
-    txyz = a
-    txzy = a
-    tyxz = a
-    tyzx = a
-    tzxy = a
-    tzyx = a
-
-    ! Compute blocked tensors
-    call blocking_xyz(txyz,bx,by,bz,delta)
-    call blocking_xyz(txzy,bx,bz,by,delta)
-    call blocking_xyz(tyxz,by,bx,bz,delta)
-    call blocking_xyz(tyzx,by,bz,bx,delta)
-    call blocking_xyz(tzxy,bz,bx,by,delta)
-    call blocking_xyz(tzyx,bz,by,bx,delta)
-
-    a = (txyz + txzy + tyxz + tyzx + tzxy + tzyx)/6.0_dp  
-
-  end subroutine blocking
-
-!============================== BLOCKING_XYZ ==================================80
-!
-! Modifies the eddy axis tensor using a specific ordering of the blocking 
-! tensors.
-!
-!==============================================================================80
-
-  subroutine blocking_xyz(t,bx,by,bz,delta)
-    implicit none 
-    integer, parameter  :: dp = selected_real_kind(15, 307) !double precision
-
-    ! INITIAL DECLARATIONS
-    ! routine's inputs and outputs
-    real(dp), dimension(3,3), intent(inout) :: t        !unblocked tensor
-    real(dp), dimension(3,3), intent(in)    :: bx       !x blocking tensor
-    real(dp), dimension(3,3), intent(in)    :: by       !y blocking tensor
-    real(dp), dimension(3,3), intent(in)    :: bz       !z blocking tensor
-    real(dp), dimension(3,3), intent(in)    :: delta    !kronecker delta 
-
-    ! constants
-    real(dp), parameter :: zero = 0.0_dp
-
-    ! variables
-    integer :: i, j, k, l
-    real(dp), dimension(3,3) :: tx    !tensor blocked with bx
-    real(dp), dimension(3,3) :: ty    !tensor blocked with by
-    real(dp), dimension(3,3) :: tz    !tensor blocked with bz
-    real(dp)                 :: trace
-    
-    continue
-
-    tx = zero
-    ty = zero
-    tz = zero
+    ! compute partial projection operator
+    do i = 1,3
+      do j = 1,3
+        h(i,j) = dinv*(delta(i,j) - bl(i,j))
+      end do
+    end do
 
     ! apply blockage correction
+    a = zero
     do i = 1,3
       do j = i,3
         do k = 1,3
           do l = 1,3
-            tx(i,j) = tx(i,j) + (delta(i,k) - bx(i,k))*(delta(j,l) - bx(j,l))*  &
-                                t(k,l)
+            a(i,j) = a(i,j) + h(i,k)*h(j,l)*ah(k,l)
           end do
         end do
-        ! symmetrize
-        tx(j,i) = tx(i,j)
+        a(j,i) = a(i,j)
       end do
     end do
 
-    do i = 1,3
-      do j = i,3
-        do k = 1,3
-          do l = 1,3
-            ty(i,j) = ty(i,j) + (delta(i,k) - by(i,k))*(delta(j,l) - by(j,l))*  &
-                                tx(k,l)
-          end do
-        end do
-        ! symmetrize
-        ty(j,i) = ty(i,j)
-      end do
-    end do
-
-    do i = 1,3
-      do j = i,3
-        do k = 1,3
-          do l = 1,3
-            tz(i,j) = tz(i,j) + (delta(i,k) - bz(i,k))*(delta(j,l) - bz(j,l))*  &
-                                ty(k,l)
-          end do
-        end do
-        ! symmetrize
-        tz(j,i) = tz(i,j)
-      end do
-    end do
-   
-    trace = tz(1,1) + tz(2,2) + tz(3,3)
-
-    ! singular point where tensor is 'normal' to the wall; no blockage
-    if (trace < zero) return
-
-    t = tz/trace
-
-  end subroutine blocking_xyz
+  end subroutine blocking
 
 !================================ STRUCTURE ===================================80
 !
@@ -1308,7 +1205,7 @@
 !
 !==============================================================================80
 
-  subroutine structure(rey, dmn, cir, a, phi, chi, scl_g, vec_g, vec_wdt,       &
+  subroutine structure(rey, dmn, cir, a, phi, chi, vec_g, vec_wdt,       &
        dot_vec_wdt, rotation_t, delta, eps, ierr)
     implicit none 
     integer, parameter  :: dp = selected_real_kind(15, 307) !double precision
@@ -1324,20 +1221,19 @@
 
     real(dp), intent(in)               :: phi     !jettal scalar
     real(dp), intent(in)               :: chi     !flattening scalar
-    real(dp), intent(in)               :: scl_g   !helical scalar
     real(dp), dimension(3), intent(in) :: vec_g   !helical vector
     real(dp), dimension(3), intent(in) :: vec_wdt !vec for frame - mean rotation
     real(dp), intent(in)               :: dot_vec_wdt !dot product of vec_wdt
 
-    logical, intent(in) :: rotation_t
+    logical, intent(in)                :: rotation_t
 
-    integer, intent(inout) :: ierr
+    integer, intent(inout)             :: ierr
 
     ! constants
-    real(dp), parameter :: zero = 0.0_dp
-    real(dp), parameter :: small = 1.0e-14_dp
-    real(dp), parameter :: half = 0.5_dp
-    real(dp), parameter :: one = 1.0_dp
+    real(dp), parameter      :: zero = 0.0_dp
+    real(dp), parameter      :: small = 1.0e-14_dp
+    real(dp), parameter      :: half = 0.5_dp
+    real(dp), parameter      :: one = 1.0_dp
 
     ! variables
     integer                  :: i, j, k, l, m
@@ -1346,7 +1242,7 @@
     real(dp)                 :: trace_afl      !a_in*fl_ni
     real(dp)                 :: coef_1, coef_2, coef_3, coef_4, coef_5
     real(dp)                 :: term
-    real(dp)                 :: sumi, sumj, sumk, sumg
+    real(dp)                 :: sum, sumi, sumj, sumk, sumg
 
     continue
     
@@ -1355,9 +1251,24 @@
       do j = i,3
         rey(i,j) = half*(1 - phi)*(delta(i,j) - a(i,j)) + phi*a(i,j)
         dmn(i,j) = half*(delta(i,j) - a(i,j))
+
+        ! check for stropholysis
+        if (rotation_t) then
+          sumg = zero
+          do k = 1,3
+            sum = zero
+            do l = 1,3
+              sum = sum + eps(k,l,i)*a(l,j) + eps(k,l,j)*a(l,i)
+            end do
+            sumg = sumg + half*vec_g(k)*sum
+          end do
+          rey(i,j) = rey(i,j) + sumg
+        end if
+
+        ! maintain constitutive relation
         cir(i,j) = delta(i,j) - rey(i,j) -dmn(i,j)
         
-        !symmetrize
+        ! symmetrize
         rey(j,i) = rey(i,j)
         dmn(j,i) = dmn(i,j)
         cir(j,i) = cir(i,j)
@@ -1427,7 +1338,7 @@
               end do
               sumk = sumk + sumi*a(l,j) + sumj*a(l,i)
             end do
-            sumg = sumg + scl_g*vec_g(k)*sumk
+            sumg = sumg + vec_g(k)*sumk
           end do
           rey(i,j) = rey(i,j) + sumg
         end if

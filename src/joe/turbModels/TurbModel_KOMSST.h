@@ -338,8 +338,8 @@ public:   // member functions
     double CL = 0.23, CETA = 70.0;
     double eps = betaStar*kine*omega;
     double LengthScale = CL*max(pow(kine,1.5)/eps, CETA*pow(nu,0.75)/pow(eps,0.25));
-    //if (realizable)            // v2f uses realizable limit
-    //  LengthScale = min(LengthScale, pow(kine,1.5)/(sqrt(3.0)*v2*C_MU*str));
+    if (realizable)
+      LengthScale = min(LengthScale, pow(kine,0.5)/(2.0/3.0*sqrt(3.0)*betaStar*str));
     return LengthScale;
   }
 

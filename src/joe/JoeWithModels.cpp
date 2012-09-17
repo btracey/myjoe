@@ -3437,27 +3437,35 @@ void JoeWithModels::calcViscousFluxNS(double *rhs_rho, double (*rhs_rhou)[3], do
         // .............................................................................................
         // SYMMETRY BOUNDARY CONDITION
         // .............................................................................................
-				if ((param->getString() == "SYMMETRY") || (param->getString() == "NOTHING"))
-				{
-					if (kine_index > -1)
-					{
-						for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
-						{
-							int icv0 = cvofa[ifa][0];
-							assert( icv0 >= 0 );
-							double nVec[3] = {0.0, 0.0, 0.0};
-							double area = normVec3d(nVec, fa_normal[ifa]);
-							
-							double *phi_bfa = scalarTranspEqVector[kine_index].phi_bfa;
-							double kine_fa  = phi_bfa[ifa];
-							
-							double tmp = 1.0/3.0*(rho[icv0] + rho_bfa[ifa])*kine_fa;
-							
-							for (int i = 0; i < 3; i++)
-								rhs_rhou[icv0][i] -= tmp*fa_normal[ifa][i];
-						}
-					}
-				}
+        if ((param->getString() == "SYMMETRY") || (param->getString() == "NOTHING"))
+        {
+          if (kine_index > -1)
+          {
+            for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+            {
+              int icv0 = cvofa[ifa][0];
+              assert( icv0 >= 0 );
+              double nVec[3] = {0.0, 0.0, 0.0};
+              double area = normVec3d(nVec, fa_normal[ifa]);
+
+              double *phi_bfa = scalarTranspEqVector[kine_index].phi_bfa;
+              double kine_fa  = phi_bfa[ifa];
+
+              //double tmp = (1.0 - nonLinear[ifa])*1.0/3.0*(rho[icv0] + rho_bfa[ifa])*kine_fa;
+              double tmp = 1.0/3.0*(rho[icv0] + rho_bfa[ifa])*kine_fa;
+
+              for (int i = 0; i < 3; i++)
+                rhs_rhou[icv0][i] -= tmp*fa_normal[ifa][i];
+
+              /*rhs_rhou[icv0][0] += nonLinear[ifa]*area*
+                  (rij_diag_fa[ifa][0]    * nVec[0] + rij_offdiag_fa[ifa][0] * nVec[1] + rij_offdiag_fa[ifa][1] * nVec[2]);
+              rhs_rhou[icv0][1] += nonLinear[ifa]*area*
+                  (rij_offdiag_fa[ifa][0] * nVec[0] + rij_diag_fa[ifa][1]    * nVec[1] + rij_offdiag_fa[ifa][2] * nVec[2]);
+              rhs_rhou[icv0][2] += nonLinear[ifa]*area*
+                  (rij_offdiag_fa[ifa][1] * nVec[0] + rij_offdiag_fa[ifa][2] * nVec[1] + rij_diag_fa[ifa][2]    * nVec[2]);*/
+            }
+          }
+        }
         // .............................................................................................
         // WALL BOUNDARY CONDITION
         // .............................................................................................

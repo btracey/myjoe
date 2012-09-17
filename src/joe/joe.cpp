@@ -294,14 +294,14 @@ public:
 /*
  * Flat channel with periodic bc's, SST
  */
-class PerChanSST: public MyJoeASBM{
+class PerChanSST: public MyJoeSST{
 protected:
   int    nn;             // number of nodes in input profile
   int    nval;           // number of variables in input profile
   double **boundVal;     // holder for input profile data
 
 public:
-  PerChanSST(char *name) : MyJoeASBM(name), UgpWithCvCompFlow(name)
+  PerChanSST(char *name) : MyJoeSST(name), UgpWithCvCompFlow(name)
   {
     if (mpi_rank == 0) cout << "PerChanSST()" << endl;
     boundVal = NULL;
@@ -407,14 +407,14 @@ public:
 /*
  * Flat channel with periodic bc's, V2F
  */
-class PerChanV2F: public MyJoeV2F{
+class PerChanV2F: public MyJoeASBM{
 protected:
   int    nn;             // number of nodes in input profile
   int    nval;           // number of variables in input profile
   double **boundVal;     // holder for input profile data
 
 public:
-  PerChanV2F(char *name) : MyJoeV2F(name), UgpWithCvCompFlow(name)
+  PerChanV2F(char *name) : MyJoeASBM(name), UgpWithCvCompFlow(name)
   {
     if (mpi_rank == 0) cout << "PerChanV2F()" << endl;
     boundVal = NULL;

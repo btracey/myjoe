@@ -583,6 +583,7 @@ public:   // constructors/destructors
       grad_enthalpy = new double[ncv_g][3];
   }
 
+
   virtual ~UgpWithCvCompFlow()
   {
     if (rho_bfa != NULL)         {delete [] rho_bfa;        rho_bfa = NULL;}
