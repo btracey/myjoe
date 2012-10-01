@@ -722,7 +722,7 @@ void JoeWithModels::runBackwardEuler()
       rhs[icv][3] = underRelax*RHSrhou[icv][2];
       rhs[icv][4] = underRelax*RHSrhoE[icv];
 
-      residField[icv] = RHSrhoE[icv];
+      residField[icv] = RHSrhou[icv][0];
 
       double tmp = cv_volume[icv]/(local_dt[icv]);
       for (int i = 0; i < 5; i++)
@@ -3804,6 +3804,97 @@ void JoeWithModels::setBC()
             else              T_bfa[ifa] = temp[icv0];     // adiabatic wall
 
             p_bfa[ifa] = press[icv0];                      // Assumes zero pressure gradient at the wall
+          }
+
+          setScalarBC(&(*zone));
+          ComputeBCProperties_T(&(*zone));
+        }
+        // .............................................................................................
+        // FARFIELD BOUNDARY CONDITION
+        // .............................................................................................
+        else if (param->getString() == "FARFIELD")
+        {
+          double u_bc[3], T_bc, p_bc, rho_bc, gamma_bc, c_bc, s_bc;
+
+          for (int i=0; i<3; i++)
+            u_bc[i] = param->getDouble(i+2);
+          p_bc = param->getDouble(5);
+          rho_bc = param->getDouble(6);
+          gamma_bc = param->getDouble(7);
+
+          double gm1 = gamma_bc - 1.0;
+          double ovgm1 = 1.0/gm1;
+
+          c_bc = sqrt(gamma_bc*p_bc/rho_bc);
+          s_bc = pow(rho_bc,gamma_bc)/p_bc ;
+
+          T_bc = p_bc/(R_gas*rho_bc);
+
+          if ((first)&&(mpi_rank == 0))
+            cout << "Applying FARFIELD      to zone: "<< zone->getName() <<"\t u_bc: "<< u_bc[0] << " "<< u_bc[1]
+                 << " "<< u_bc[2] <<" rho_bc: " << rho_bc << " p_bc: " << p_bc << " gamma_bc: " << gamma_bc << " T_bc: "
+                 << T_bc << endl;
+
+          for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+          {
+            int icv0 = cvofa[ifa][0];
+            assert( icv0 >= 0 );
+
+            double nVec[3];
+            double area = normVec3d(nVec, fa_normal[ifa]);
+
+            //Compute normal velocity of freestream
+            double qn_bc = vecDotVec3d(nVec,u_bc);
+
+            //Subtract from normal velocity of mesh
+            double vn_bc = qn_bc;// - normalvel_bfa[ifa];
+
+            //Compute normal velocity of internal cell
+            double qne = vecDotVec3d(nVec,vel[icv0]);
+
+            //Compute speed of sound in internal cell
+            double ce = sqrt(gamma[icv0]*press[icv0]/rho[icv0]);
+
+            double ac1, ac2;
+
+            //Compute the Riemann invariants in the halo cell
+            if (vn_bc > -c_bc)           // Outflow or subsonic inflow.
+              ac1 = qne   + 2.0*ovgm1*ce;
+            else                     // Supersonic inflow.
+              ac1 = qn_bc + 2.0*ovgm1*c_bc;
+
+
+            if(vn_bc > c_bc)             // Supersonic outflow.
+              ac2 = qne   - 2.0*ovgm1*ce;
+            else                     // Inflow or subsonic outflow.
+              ac2 = qn_bc - 2.0*ovgm1*c_bc;
+
+
+            double qnf = 0.5*(ac1 + ac2);
+            double cf  = 0.25*(ac1 - ac2)*gm1;
+
+            double velf[3], sf;
+
+            if (vn_bc > 0)                                                       // Outflow
+            {
+              for (int i=0; i<3; i++)
+                velf[i] = vel[icv0][i] + (qnf - qne)*nVec[i];
+              sf = pow( rho[icv0], gamma[icv0])/press[icv0];
+            }
+            else                                                                 // Inflow
+            {
+              for (int i=0; i<3; i++)
+                velf[i] = u_bc[i] + (qnf - qn_bc)*nVec[i];
+              sf = s_bc;
+            }
+
+            //Compute density, pressure and velocity at boundary face
+            rho_bfa[ifa] = pow( (sf*cf*cf/gamma[icv0]), ovgm1);
+            for (int i=0; i<3; i++)
+              vel_bfa[ifa][i] = velf[i];
+            p_bfa[ifa] = rho_bfa[ifa]*cf*cf/gamma[icv0];
+            T_bfa[ifa] = p_bfa[ifa]/(R_gas*rho_bfa[ifa]);
+
           }
 
           setScalarBC(&(*zone));

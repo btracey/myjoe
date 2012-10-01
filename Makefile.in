@@ -3,7 +3,7 @@
 ####---------------------------------------------------------------
 
 PARMETIS_INC = -I/usr/local/ParMetis-4.0.2/include
-PARMETIS_LIB = -L/usr/local/Parmetis-4.0.2/lib -lparmetis
+PARMETIS_LIB = -L/usr/local/ParMetis-4.0.2/lib -lparmetis
 
 METIS_INC = -I/usr/local/metis/include
 METIS_LIB = -L/usr/local/metis/lib -lmetis

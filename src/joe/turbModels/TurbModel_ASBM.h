@@ -5,8 +5,8 @@
 #include "TurbModel_V2F.h"
 
 
-//typedef RansTurbKOmSST TURB_MOD_FOR_ASBM; // define the turbulence model used with the ASBM
-typedef RansTurbV2F TURB_MOD_FOR_ASBM;
+typedef RansTurbKOmSST TURB_MOD_FOR_ASBM; // define the turbulence model used with the ASBM
+//typedef RansTurbV2F TURB_MOD_FOR_ASBM;
 
 extern "C"{
   void asbm_(

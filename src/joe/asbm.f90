@@ -1276,7 +1276,7 @@
     end do
 
     ! compute flattened tensors
-    if (isnan(chi)) then
+    if (chi /= chi ) then
       ierr = 8
       return
     end if

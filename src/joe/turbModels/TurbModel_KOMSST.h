@@ -224,7 +224,7 @@ public:   // member functions
         }
     }
     
-    // just for output
+    // just for output and visulization
     for (int icv=0; icv<ncv; icv++)
     {
       muT[icv] = InterpolateAtCellCenterFromFaceValues(mut_fa, icv);
@@ -341,6 +341,21 @@ public:   // member functions
     if (realizable)
       LengthScale = min(LengthScale, pow(kine,0.5)/(2.0/3.0*sqrt(3.0)*betaStar*str));
     return LengthScale;
+  }
+
+  virtual void calcRsBoussinesq()
+  {
+    for (int icv = 0; icv < ncv; icv++)
+    {
+      double term1 = (2.0/3.0) * rho[icv] * kine[icv];
+      // build Reynolds Stress tensor according to compressible formulation written above
+      rij_diag[icv][0] = term1 - muT[icv] * 2.0 * (grad_u[icv][0][0] - 1.0/3.0*diverg[icv]);
+      rij_diag[icv][1] = term1 - muT[icv] * 2.0 * (grad_u[icv][1][1] - 1.0/3.0*diverg[icv]);
+      rij_diag[icv][2] = term1 - muT[icv] * 2.0 * (grad_u[icv][2][2] - 1.0/3.0*diverg[icv]);
+      rij_offdiag[icv][0] =    - muT[icv] * (grad_u[icv][0][1] + grad_u[icv][1][0]);
+      rij_offdiag[icv][1] =    - muT[icv] * (grad_u[icv][0][2] + grad_u[icv][2][0]);
+      rij_offdiag[icv][2] =    - muT[icv] * (grad_u[icv][1][2] + grad_u[icv][2][1]);
+    }
   }
 
   virtual void sourceHookScalarRansTurb_new(double *rhs, double *A, const string &name, int flagImplicit)
