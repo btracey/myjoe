@@ -13,9 +13,9 @@ void JoeWithModels::run()
 	
 	if (checkParam("RESET_STEP"))
 	{
-		step = 0;
-		if (mpi_rank == 0)
-			cout << "RESET_STEP: " << step << endl;
+	  step = 0;
+	  if (mpi_rank == 0)
+	    cout << "RESET_STEP: " << step << endl;
 	}
 	
 	// initialize models

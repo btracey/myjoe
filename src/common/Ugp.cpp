@@ -10002,7 +10002,7 @@ void Ugp::writeRestart(const char * filename)
       }
     }
 
-    // Now build stuff neccessary for mpi types and turn 
+    // Now build stuff necessary for mpi types and turn
     // no_flag into a global node indexing with the
     // correct offsets...
 
@@ -10284,7 +10284,7 @@ void Ugp::writeRestart(const char * filename)
       my_cv_count += my_cv_zone_count[i];
     }
 
-    // we should nave counted all cvs...
+    // we should have counted all cvs...
     assert(my_cv_count==ncv);
 
     if (io_write_flag==0)

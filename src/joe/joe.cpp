@@ -34,9 +34,8 @@ public:
 
   virtual ~MyJoe()  {}
 
-  void initialHook() {JoeWithModels::initialHook();}  
+  void initialHook() { JoeWithModels::initialHook();}
 
-  
   
   /*
    * write wall values to file in tecplot format
@@ -294,14 +293,14 @@ public:
 /*
  * Flat channel with periodic bc's, SST
  */
-class PerChanSST: public MyJoeASBM{
+class PerChanSST: public MyJoeSST{
 protected:
   int    nn;             // number of nodes in input profile
   int    nval;           // number of variables in input profile
   double **boundVal;     // holder for input profile data
 
 public:
-  PerChanSST(char *name) : MyJoeASBM(name), UgpWithCvCompFlow(name)
+  PerChanSST(char *name) : MyJoeSST(name), UgpWithCvCompFlow(name)
   {
     if (mpi_rank == 0) cout << "PerChanSST()" << endl;
     boundVal = NULL;
@@ -531,14 +530,14 @@ public:
 /*
  * Boundary Layer on Flat Plate with SST
  */
-class BlayerSST: public MyJoeSST {
+class BlayerSST: public MyJoeASBM {
 protected:
   int    nn;             // number of nodes in input profile
   int    nval;           // number of variables in input profile
   double **boundVal;     // holder for input profile data
 
 public:
-  BlayerSST(char *name) : MyJoeSST(name), UgpWithCvCompFlow(name)
+  BlayerSST(char *name) : MyJoeASBM(name), UgpWithCvCompFlow(name)
   {
     if (mpi_rank == 0) cout << "BlayerSST()" << endl;
   }
@@ -835,7 +834,6 @@ public:
 
   virtual void finalHook()
   {
-    calcRsBoussinesq();
     extractturbprofile();
 
     for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
@@ -1219,14 +1217,14 @@ public:
 /*
  * Flat channel with periodic bc's, SST
  */
-class PerHumpSST: public MyJoeSST{
+class PerHumpSST: public MyJoeASBM{
 protected:
   int    nn;             // number of nodes in input profile
   int    nval;           // number of variables in input profile
   double **boundVal;     // holder for input profile data
 
 public:
-  PerHumpSST(char *name) : MyJoeSST(name), UgpWithCvCompFlow(name)
+  PerHumpSST(char *name) : MyJoeASBM(name), UgpWithCvCompFlow(name)
   {
     if (mpi_rank == 0) cout << "PerHumpSST()" << endl;
     boundVal = NULL;
@@ -1326,6 +1324,22 @@ public:
         A[nbocv_i[icv]][1][0] -= cv_volume[icv]*grav;
         A[nbocv_i[icv]][4][1] -= cv_volume[icv]*grav;
       }
+    }
+  }
+
+  virtual void temporalHook()
+  {
+    if (step%10000 == 0)
+    {
+      //calcRsBoussinesq();
+      for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+        if (zone->getKind() == FA_ZONE_BOUNDARY)
+        {
+          Param *param;
+          if (getParam(param, zone->getName()))
+            if (param->getString() == "WALL")
+              writeWallValues(zone->getName());
+        }
     }
   }
 
@@ -1462,6 +1476,22 @@ public:
         A[nbocv_i[icv]][1][0] -= cv_volume[icv]*grav;
         A[nbocv_i[icv]][4][1] -= cv_volume[icv]*grav;
       }
+    }
+  }
+
+  virtual void temporalHook()
+  {
+    if (step%10000 == 0)
+    {
+      //calcRsBoussinesq();
+      for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+        if (zone->getKind() == FA_ZONE_BOUNDARY)
+        {
+          Param *param;
+          if (getParam(param, zone->getName()))
+            if (param->getString() == "WALL")
+              writeWallValues(zone->getName());
+        }
     }
   }
 

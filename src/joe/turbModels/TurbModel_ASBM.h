@@ -33,9 +33,18 @@ public:   // constructors
     ar_diag       = NULL;     registerVector(ar_diag,       "ar_diag",       CV_DATA);
     ar_offdiag    = NULL;     registerVector(ar_offdiag,    "ar_offdiag",    CV_DATA);
 
-    etar          = NULL;     registerScalar(etar,          "etar",       CV_DATA);
-    etaf          = NULL;     registerScalar(etaf,          "etaf",       CV_DATA);
-    a2            = NULL;     registerScalar(a2,            "a2",         CV_DATA);
+    etar          = NULL;     registerScalar(etar,          "etar",          CV_DATA);
+    etaf          = NULL;     registerScalar(etaf,          "etaf",          CV_DATA);
+    a2            = NULL;     registerScalar(a2,            "a2",            CV_DATA);
+
+    scal_phi      = NULL;     registerScalar(scal_phi,      "scal_phi",      CV_DATA);
+    scal_bet      = NULL;     registerScalar(scal_bet,      "scal_bet",      CV_DATA);
+    scal_chi      = NULL;     registerScalar(scal_chi,      "scal_chi",      CV_DATA);
+
+    // For debugging only
+    hatwt         = NULL;     registerScalar(hatwt,         "hatwt",         CV_DATA);
+    hatst         = NULL;     registerScalar(hatst,         "hatst",         CV_DATA);
+    ststa         = NULL;     registerScalar(ststa,         "ststa",         CV_DATA);
 
     // Blocking variables
     block_diag    = NULL;     registerVector(block_diag,    "block_diag",    CV_DATA);
@@ -64,6 +73,15 @@ protected:   // member vars
   double   *etar;
   double   *etaf;
   double   *a2;
+
+  double   *scal_phi;
+  double   *scal_bet;
+  double   *scal_chi;
+
+  // For debugging only
+  double   *hatwt;
+  double   *hatst;
+  double   *ststa;
 
   // Blocking variables
   double   (*block_diag)[3];      // diagonal blockage tensor
@@ -181,7 +199,8 @@ public:   // member functions
 
   virtual void setNonLinearDomain(){
     // default
-    cout << "non-linear domain set as default" << endl;
+    if (mpi_rank == 0)
+      cout << "NON-LINEAR DOMAIN SET AS DEFAULT." << endl;
     for (int ifa = 0; ifa < nfa; ifa++)
       nonLinear[ifa] = 1.0;
   }
@@ -201,12 +220,7 @@ public:   // member functions
                           {0.0, 0.0, 0.0}};
 
     // In and out variables
-    double AS[3][3] = {{0.3, 0.0, 0.0},
-                       {0.0, 0.3, 0.0},
-                       {0.0, 0.0, 0.4}};
-    double AR[3][3] = {{0.3, 0.0, 0.0},
-                       {0.0, 0.3, 0.0},
-                       {0.0, 0.0, 0.4}};
+    double AS[3][3], AR[3][3];
 
     // Output variables
     double REY[3][3] = {{0.0, 0.0, 0.0},
@@ -267,6 +281,15 @@ public:   // member functions
         BL[1][0] = BL[0][1];            BL[1][1] = block_diag[icv][1];     BL[1][2] = block_offdiag[icv][2];
         BL[2][0] = BL[0][2];            BL[2][1] = BL[1][2];               BL[2][2] = block_diag[icv][2];
 
+        // Strained and rotated A's
+        AS[0][0] = as_diag[icv][0];     AS[0][1] = as_offdiag[icv][0];     AS[0][2] = as_offdiag[icv][1];
+        AS[1][0] = AS[0][1];            AS[1][1] = as_diag[icv][1];        AS[1][2] = as_offdiag[icv][2];
+        AS[2][0] = AS[0][2];            AS[2][1] = AS[1][2];               AS[2][2] = as_diag[icv][2];
+
+        AR[0][0] = ar_diag[icv][0];     AR[0][1] = ar_offdiag[icv][0];     AR[0][2] = ar_offdiag[icv][1];
+        AR[1][0] = AR[0][1];            AR[1][1] = ar_diag[icv][1];        AR[1][2] = ar_offdiag[icv][2];
+        AR[2][0] = AR[0][2];            AR[2][1] = AR[1][2];               AR[2][2] = ar_diag[icv][2];
+
         // Call the ASBM
         ierr = 0;
 
@@ -298,10 +321,17 @@ public:   // member functions
         ar_diag[icv][1] = AR[1][1];       ar_offdiag[icv][1] = AR[0][2];
         ar_diag[icv][2] = AR[2][2];       ar_offdiag[icv][2] = AR[1][2];
 
-        etar[icv] = CIR[1][0];
-        etaf[icv] = CIR[1][1];
-        a2[icv]   = CIR[1][2];
+        scal_phi[icv] = CIR[0][0];
+        scal_bet[icv] = CIR[1][0];
+        scal_chi[icv] = CIR[2][0];
 
+        etar[icv] = CIR[0][1];
+        etaf[icv] = CIR[1][1];
+        a2[icv]   = CIR[2][1];
+
+        hatwt[icv] = CIR[0][2];
+        hatst[icv] = CIR[1][2];
+        ststa[icv] = CIR[2][2];
     }
     updateCvData(etar, REPLACE_DATA);
     updateCvData(etaf, REPLACE_DATA);

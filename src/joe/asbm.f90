@@ -630,7 +630,7 @@
     end do
 
     ! compute structure parameters
-    eta_c1 = hat_wt/hat_st
+    eta_c1 = hat_wt/(hat_st + 0.1_dp)
     eta_c2 = hat_wtt/hat_st
     
     if (eta_c1 < zero) eta_c1 = zero
@@ -739,6 +739,10 @@
     cir(2,1) = eta_r
     cir(2,2) = eta_f
     cir(2,3) = trace_aa
+    
+    cir(3,1) = hat_wt
+    cir(3,2) = hat_st
+    cir(3,3) = trace_ststa
   end subroutine asbm
 
 !================================= LINSOLVER ==================================80
