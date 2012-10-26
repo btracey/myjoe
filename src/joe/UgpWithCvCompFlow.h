@@ -715,7 +715,7 @@ public:   // member variables
   double epsilonSDWLS;
   
   int turbModel;
-  enum TurbModel{NONE, SA, KEPS, KOM, KOMSST, V2F};
+  enum TurbModel{NONE, SA, KEPS, KOM, KOMSST, V2F, ASBM};
 
 
   // Approximate Riemann solver
@@ -1294,6 +1294,8 @@ public:   // member functions
   virtual void UserDefinedScalarClipping(const string &name)  {/*empty*/}
   
   void calcViscousFluxScalar_new(double *rhs_rhoScal, double *Ascal, ScalarTranspEq &transpScal, int flagImplicit);
+
+  void calcViscousFluxAuxScalar(double *rhs, double *A, double *phi_bfa, double (*grad_phi)[3]);
 
   
   

@@ -1,6 +1,106 @@
 #include "UgpWithCvCompFlow.h"
 
 
+void UgpWithCvCompFlow::calcViscousFluxAuxScalar(double *rhs, double *A, double *phi_bfa, double (*grad_phi)[3])
+{
+  // ..........................................................................................
+  // cycle trough internal faces first
+  // ..........................................................................................
+  for (int ifa = nfa_b; ifa < nfa; ++ifa)
+  {
+    int icv0 = cvofa[ifa][0];
+    int icv1 = cvofa[ifa][1];
+    assert( icv0 >= 0 );
+    assert( icv1 >= 0 );
+
+    // viscous flux
+    double sVec[3], nVec[3];
+    double area = normVec3d(nVec, fa_normal[ifa]);
+    vecMinVec3d(sVec, x_cv[icv1], x_cv[icv0]);
+    double ds = normVec3d(sVec);
+
+    double dx0[3], dx1[3];
+    vecMinVec3d(dx0, x_fa[ifa], x_cv[icv0]);
+    vecMinVec3d(dx1, x_fa[ifa], x_cv[icv1]);
+    double w0 = sqrt(vecDotVec3d(dx0, dx0));
+    double w1 = sqrt(vecDotVec3d(dx1, dx1));
+
+    double grad_f[3], proj_grad, lim_grad[3];
+
+    for (int i = 0; i < 3; i++)
+      grad_f[i] = (w1*grad_phi[icv0][i] + w0*grad_phi[icv1][i])/(w0 + w1);
+    proj_grad = vecDotVec3d(grad_f,sVec);
+    for (int i = 0; i < 3; i++)
+      lim_grad[i] = grad_f[i] - proj_grad*sVec[i];
+
+    double explVisc = (lim_grad[0]*nVec[0] + lim_grad[1]*nVec[1] + lim_grad[2]*nVec[2])*area;
+    double implVisc = vecDotVec3d(sVec, nVec)*area/ds;
+
+    // build equation system
+    int noc00, noc01, noc11, noc10;
+    getImplDependencyIndex(noc00,noc01,noc11,noc10,icv0,icv1);
+
+    A[noc00] += implVisc;
+    A[noc01] -= implVisc;
+    rhs[icv0] += explVisc;
+
+    if (icv1 < ncv)
+    {
+      A[noc11] += implVisc;
+      A[noc10] -= implVisc;
+      rhs[icv1] -= explVisc;
+    }
+  }
+
+  // ..........................................................................................
+  // cycle trough boundary faces
+  // ..........................................................................................
+  for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+  {
+    if (zone->getKind() == FA_ZONE_BOUNDARY)
+    {
+      Param *param;
+      if (getParam(param, zone->getName()))
+      {
+        if (param->getString() == "WALL")
+        {
+          for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+          {
+            int icv0 = cvofa[ifa][0];
+            assert( icv0 >= 0 );
+            int noc00 = nbocv_i[icv0];
+
+            double sVec[3], nVec[3];
+            double area = normVec3d(nVec, fa_normal[ifa]);
+            vecMinVec3d(sVec, x_fa[ifa], x_cv[icv0]);
+            double ds = normVec3d(sVec);
+
+            double proj_grad = vecDotVec3d(grad_phi[icv0],sVec);
+            double lim_grad[3];
+            for (int i = 0; i < 3; i++)
+              lim_grad[i] = grad_phi[icv0][i] - proj_grad*sVec[i];
+
+            double implVisc = vecDotVec3d(sVec, nVec)*area/ds;
+            double explVisc = (lim_grad[0]*nVec[0] +
+                               lim_grad[1]*nVec[1] +
+                               lim_grad[2]*nVec[2])*area +
+                               phi_bfa[ifa]*implVisc;
+            //rhs_block[icv0] += phi_asbm_bfa[ifa]*impl_coeff;
+
+            // build equation system
+            A[noc00] += implVisc;
+            rhs[icv0] += explVisc;
+          }
+        }
+        else
+        {
+          // do nothing as flux is zero
+        }
+      }
+    }
+  }
+
+}
 
 void UgpWithCvCompFlow::solveScalars(double *massFlux)
 {

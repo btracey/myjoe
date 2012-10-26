@@ -612,6 +612,15 @@
     dot_vec_wtt = vec_wtt(1)**2.0_dp + vec_wtt(2)**2.0_dp + vec_wtt(3)**2.0_dp
     dot_vec_wdt = vec_wdt(1)**2.0_dp + vec_wdt(2)**2.0_dp + vec_wdt(3)**2.0_dp
 
+    ! check for total rotation
+    if (dot_vec_wtt > zero) then
+      mag_vec_wtt = sqrt(dot_vec_wtt)
+      rotation_t = .true.
+    else
+      mag_vec_wtt = zero
+      rotation_t = .false.
+    end if
+
     ! compute quantities based on total rotation rate
     hat_wt  = zero        
     hat_wtt = zero 
@@ -630,7 +639,8 @@
     end do
 
     ! compute structure parameters
-    eta_c1 = hat_wt/(hat_st + 0.1_dp)
+    eta_c1 = hat_wt/(hat_st)
+    !eta_c1 = hat_wt/hat_st
     eta_c2 = hat_wtt/hat_st
     
     if (eta_c1 < zero) eta_c1 = zero
@@ -641,7 +651,7 @@
 
     ! compute phis, chis, bets
     if (hat_st < zero) then
-      ! no strain
+      ! without strain
       phis = zero
       chis = zero
       bets = one
@@ -652,25 +662,8 @@
         chis = zero
         bets = zero
       end if
-
-      ! check for total rotation
-      if (dot_vec_wtt > zero) then
-        mag_vec_wtt = sqrt(dot_vec_wtt)
-        rotation_t = .true.
-      else
-        mag_vec_wtt = zero
-        rotation_t = .false.
-      end if
     else
       ! with strain
-      if (dot_vec_wtt > zero) then
-        mag_vec_wtt = sqrt(dot_vec_wtt)
-        rotation_t = .true.
-      else
-        mag_vec_wtt = zero
-        rotation_t = .false.
-      end if
-
       oma = 1 - trace_aa
       sqamth = sqrt(trace_aa - third)
 

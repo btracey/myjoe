@@ -5,8 +5,8 @@
 #include "TurbModel_V2F.h"
 
 
-typedef RansTurbKOmSST TURB_MOD_FOR_ASBM; // define the turbulence model used with the ASBM
-//typedef RansTurbV2F TURB_MOD_FOR_ASBM;
+//typedef RansTurbKOmSST TURB_MOD_FOR_ASBM; // define the turbulence model used with the ASBM
+typedef RansTurbV2F TURB_MOD_FOR_ASBM;
 
 extern "C"{
   void asbm_(
@@ -22,6 +22,8 @@ public:   // constructors
   {
     if (mpi_rank == 0)
       cout << "RansTurbASBM()" << endl;
+
+    turbModel = ASBM;
 
     // General variables
     st_diag       = NULL;     registerVector(st_diag,       "st_diag",       CV_DATA);
@@ -174,13 +176,6 @@ public:   // member functions
       }
     }
     calcCvScalarGrad(grad_bphi, bphi, bphi_bfa, gradreconstruction, limiterNavierS, bphi, epsilonSDWLS);
-  }
-
-  virtual void finalHookScalarRansTurbModel()
-  {
-    if (bphi_bfa != NULL)  {delete [] bphi_bfa;     bphi_bfa = NULL;}
-    if (grad_bphi != NULL) {delete [] grad_bphi;    grad_bphi = NULL;}
-    if (mpi_rank == 0) fclose(finfo);
   }
 
   virtual void calcRansTurbViscMuet()
@@ -476,7 +471,8 @@ public:   // member functions
     // =========================================================================================
     // compute A_block and rhs_block
     // =========================================================================================
-
+    calcViscousFluxAuxScalar(rhs_block, A_block, bphi_bfa, grad_bphi);
+    /*
     // ..........................................................................................
     // cycle trough internal faces first
     // ..........................................................................................
@@ -571,7 +567,7 @@ public:   // member functions
           }
         }
       }
-    }
+    }*/
 
     // ..........................................................................................
     // cycle through cell centroids to compute source terms
@@ -658,6 +654,8 @@ public:   // member functions
       myRes += fabs(thisRes);
     }
     MPI_Reduce(&myRes,&Res,1,MPI_DOUBLE,MPI_SUM,0,mpi_comm);
+
+    updateCvData(bphi, REPLACE_DATA);
 
     // output for info
     if (mpi_rank == 0)
@@ -801,6 +799,12 @@ public:   // member functions
     }
   }
 
+  virtual void finalHookScalarRansTurbModel()
+  {
+    if (bphi_bfa != NULL)  {delete [] bphi_bfa;     bphi_bfa = NULL;}
+    if (grad_bphi != NULL) {delete [] grad_bphi;    grad_bphi = NULL;}
+    if (mpi_rank == 0) fclose(finfo);
+  }
 };
 
 

@@ -21,6 +21,8 @@ public:   // constructors
     sigma_eps  = getDoubleParam("sigma_eps", "1.3");
     ceps1      = getDoubleParam("ceps1",  "1.44");
     ceps2      = getDoubleParam("ceps2",  "1.92");
+    CETA       = getDoubleParam("CETA",  "70.0");
+    CL         = getDoubleParam("CL",    "0.23");
     
     realizable = getIntParam("REALIZABILITY", "0");
     
@@ -30,7 +32,7 @@ public:   // constructors
     ScalarTranspEq *eq;
     eq = registerScalarTransport("kine", CV_DATA);
     eq->relax = getDoubleParam("RELAX_kine", "1.0");
-    eq->phiZero = 1.0e-8;
+    eq->phiZero = 1.0e-9;
     eq->phiZeroRel = 1.0e-2;
     eq->phiMaxiter = 1000;
     eq->lowerBound = 1.0e-10;
@@ -46,6 +48,8 @@ public:   // constructors
 
     strMag = NULL;       registerScalar(strMag, "strMag", CV_DATA);
     diverg = NULL;       registerScalar(diverg, "diverg", CV_DATA);
+    turbTS = NULL;       registerScalar(turbTS, "turbTS", CV_DATA);
+    turbLS = NULL;       registerScalar(turbLS, "turbLS", CV_DATA);
     muT    = NULL;       registerScalar(muT, "muT", CV_DATA);
   }
 
@@ -61,9 +65,7 @@ public:   // member vars
                     ///                            1... simple c_mu limiter
                     ///                            2... time scale limiter
 
-
-
-  double C_MU, sigma_kine, sigma_eps, ceps1, ceps2;
+  double C_MU, sigma_kine, sigma_eps, ceps1, ceps2, CETA, CL;
 
 public:   // member functions
 
@@ -130,10 +132,10 @@ public:   // member functions
         double strain = (w1*strMag[icv0] + w0*strMag[icv1])/(w0+w1);
         double s = strain*kine_fa/eps_fa;
         double cmu = min(C_MU, sqrt(C_MU)/s);
-        mut_fa[ifa] = min(cmu*rho_fa*kine_fa*kine_fa/eps_fa, 1000.0);
+        mut_fa[ifa] = min(cmu*rho_fa*kine_fa*kine_fa/eps_fa, 10000.0);
       }
       else
-        mut_fa[ifa] = min(C_MU*rho_fa*kine_fa*kine_fa/eps_fa, 1000.0);
+        mut_fa[ifa] = min(C_MU*rho_fa*kine_fa*kine_fa/eps_fa, 10000.0);
     }
 
     // boundary faces
@@ -152,28 +154,20 @@ public:   // member functions
           {
             double s = strMag[icv0]*kine[icv0]/eps[icv0];
             double cmu = min(C_MU, sqrt(C_MU)/s);
-            mut_fa[ifa] = min(cmu*rho[icv0]*kine[icv0]*kine[icv0]/eps[icv0], 1000.0);    // zero order extrapolation for others
+            mut_fa[ifa] = min(cmu*rho[icv0]*kine[icv0]*kine[icv0]/eps[icv0], 100.0);    // zero order extrapolation for others
           }
           else
-            mut_fa[ifa] = min(C_MU*rho[icv0]*kine[icv0]*kine[icv0]/eps[icv0], 1000.0);    // zero order extrapolation for others
+            mut_fa[ifa] = min(C_MU*rho[icv0]*kine[icv0]*kine[icv0]/eps[icv0], 100.0);    // zero order extrapolation for others
         }
     }
 
     // just for output 
     for (int icv=0; icv<ncv; icv++)
-      muT[icv] = InterpolateAtCellCenterFromFaceValues(mut_fa, icv);
-//    {
-//      muT[icv] = 0.0;
-//
-//      int foc_f = faocv_i[icv];
-//      int foc_l = faocv_i[icv + 1] - 1;
-//      for (int foc=foc_f; foc<=foc_l; foc++)
-//      {
-//        int ifa = faocv_v[foc];
-//        muT[icv] += mut_fa[ifa];
-//      }
-//      muT[icv] /= (double)(foc_l-foc_f+1);
-//    }
+    {
+      muT[icv]    = InterpolateAtCellCenterFromFaceValues(mut_fa, icv);
+      turbTS[icv] = calcTurbTimeScale(kine[icv], eps[icv], strMag[icv], calcMuLam(icv)/rho[icv], realizable);
+      turbLS[icv] = calcTurbLengthScale(kine[icv], eps[icv], strMag[icv], calcMuLam(icv)/rho[icv], realizable);
+    }
   }
 
   virtual void diffusivityHookScalarRansTurb(const string &name)
@@ -183,80 +177,36 @@ public:   // member functions
     if (name == "kine")
     {
       eq = getScalarTransportData(name);
-      
-      // internal faces
-      for (int ifa=nfa_b; ifa<nfa; ifa++)
-      {
-        int icv0 = cvofa[ifa][0];
-        int icv1 = cvofa[ifa][1];
-
-        double dx0[3], dx1[3];
-        vecMinVec3d(dx0, x_fa[ifa], x_cv[icv0]);
-        vecMinVec3d(dx1, x_fa[ifa], x_cv[icv1]);
-        double w0 = sqrt(vecDotVec3d(dx0, dx0));
-        double w1 = sqrt(vecDotVec3d(dx1, dx1));
-
+      for (int ifa = 0; ifa < nfa; ifa++)
         eq->diff[ifa] = mul_fa[ifa] + mut_fa[ifa]/sigma_kine;
-      }
-
-      // boundary faces
-      for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
-      if (zone->getKind() == FA_ZONE_BOUNDARY)
-      {
-        if (zoneIsWall(zone->getName()))
-          for (int ifa=zone->ifa_f; ifa<=zone->ifa_l; ifa++)
-          {
-            int icv0 = cvofa[ifa][0];
-            eq->diff[ifa] = mul_fa[ifa];
-          }
-        else
-          for (int ifa=zone->ifa_f; ifa<=zone->ifa_l; ifa++)
-          {
-            int icv0 = cvofa[ifa][0];
-            eq->diff[ifa] = mul_fa[ifa] + mut_fa[ifa]/sigma_kine;
-          }
-      }
     }
     
     if (name == "eps")
     {
       eq = getScalarTransportData(name);
-      
-      // internal faces
       for (int ifa=nfa_b; ifa<nfa; ifa++)
-      {
-        int icv0 = cvofa[ifa][0];
-        int icv1 = cvofa[ifa][1];
-
-        double dx0[3], dx1[3];
-        vecMinVec3d(dx0, x_fa[ifa], x_cv[icv0]);
-        vecMinVec3d(dx1, x_fa[ifa], x_cv[icv1]);
-        double w0 = sqrt(vecDotVec3d(dx0, dx0));
-        double w1 = sqrt(vecDotVec3d(dx1, dx1));
-
         eq->diff[ifa] = mul_fa[ifa] + mut_fa[ifa]/sigma_eps;
-      }
-
-      // boundary faces
-      for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
-      if (zone->getKind() == FA_ZONE_BOUNDARY)
-      {
-        if (zoneIsWall(zone->getName()))
-          for (int ifa=zone->ifa_f; ifa<=zone->ifa_l; ifa++)
-          {
-            int icv0 = cvofa[ifa][0];
-            eq->diff[ifa] = mul_fa[ifa];
-          }
-        else
-          for (int ifa=zone->ifa_f; ifa<=zone->ifa_l; ifa++)
-          {
-            int icv0 = cvofa[ifa][0];
-            eq->diff[ifa] = mul_fa[ifa] + mut_fa[ifa]/sigma_eps;
-          }
-      }
     }
   }
   
+  inline double calcTurbTimeScale(const double &kine, const double &eps,
+                                  const double &str, const double &nu, int realizable)
+  {
+    double TimeScale = max(kine/eps, 6.0*sqrt(nu/eps));
+    if (realizable)
+      TimeScale = min(TimeScale, sqrt(3.0)/(2.0*C_MU*str));
+    return TimeScale;
+  }
+
+  inline double calcTurbLengthScale(const double &kine, const double &eps,
+                                    const double &str, const double &nu, int realizable)
+  {
+    double LengthScale = CL*max(pow(kine,1.5)/eps, CETA*pow(nu,0.75)/pow(eps,0.25));
+    if (realizable)
+      LengthScale = min(LengthScale, sqrt(kine)*sqrt(3.0)/(2*C_MU*str));
+    return LengthScale;
+  }
+
   virtual double calcTurbProd(int icv)
   {    
     if (realizable == 1)
@@ -273,128 +223,62 @@ public:   // member functions
     }
   }
 
-  virtual void sourceHookScalarRansTurb(double *rhs, double *A, const string &name)
-  {
-    if (name == "kine")     // Pk - rho*eps
-    for (int icv=0; icv<ncv; icv++)
-    {
-      double src = calcTurbProd(icv);
-      rhs[icv] += src*cv_volume[icv];
-
-      if (A != NULL)
-      {
-        double dsrcdphi = rho[icv]*eps[icv]/kine[icv];
-        int noc00 = nbocv_i[icv];
-        A[noc00] += dsrcdphi*cv_volume[icv];
-      }
-    }
-
-    if (name == "eps")    // 
-    for (int icv=0; icv<ncv; icv++)
-    {
-      double src = eps[icv]/kine[icv]*ceps1*calcTurbProd(icv);
-      rhs[icv] += src*cv_volume[icv];
-
-
-      if (A != NULL)
-      {
-        double dsrcdphi = ceps2*rho[icv]*eps[icv]/kine[icv];
-        int noc00 = nbocv_i[icv];
-        A[noc00] += dsrcdphi*cv_volume[icv];
-      }
-    }
-  }
-  
-/*  virtual void sourceHookScalarRansTurb(double *rhs, double *A, const string &name)
-  {
-    if (name == "kine")     // Pk - rho*eps
-    for (int icv=0; icv<ncv; icv++)
-    {
-      double src = 0.0;
-      if (SinhaFix == 1)
-      {
-        double b1Inf = 0.4;
-        double b1Prime = b1Inf*(1.0-exp(1.0-Mach1));
-        src = -2.0/3.0*rho[icv]*kine[icv]*(grad_u[icv][0][0])*(1.0-b1Prime);
-      }
-      else if (SinhaFix == 2)
-      {
-        double b1Inf = 0.4;
-        double b1Prime = b1Inf*(1.0-exp(1.0-Mach1));
-        src = calcTurbProd(icv)*(1.0-b1Prime);
-      }
-      else
-        src = calcTurbProd(icv);
-      
-      rhs[icv] += src*cv_volume[icv];
-
-      double dsrcdphi = rho[icv]*eps[icv]/kine[icv];
-      int noc00 = nbocv_i[icv];
-      A[noc00] += dsrcdphi*cv_volume[icv];
-    }
-
-    if (name == "eps")    // 
-    for (int icv=0; icv<ncv; icv++)
-    {
-      double prod = calcTurbProd(icv);
-      double src = 0.0;
-      
-      if ((SinhaFix == 1) || (SinhaFix == 2))
-      {
-        double ceps1Mod = 1.25 + 0.2*(Mach1-1.0);
-        src = eps[icv]/kine[icv]*ceps1Mod*prod;
-      }
-      else
-        src = eps[icv]/kine[icv]*ceps1*prod;
-            
-      rhs[icv] += src*cv_volume[icv];
-
-      double dsrcdphi = ceps2*rho[icv]*eps[icv]/kine[icv];
-      int noc00 = nbocv_i[icv];
-      A[noc00] += dsrcdphi*cv_volume[icv];
-    }
-  }*/
-
-  virtual void sourceHookScalarRansTurbExpl(double *rhs, const string &name)
-  {
-    if (name == "kine")     // Pk - rho*eps
-    for (int icv=0; icv<ncv; icv++)
-    {
-      double src = calcTurbProd(icv)-rho[icv]*eps[icv];
-      rhs[icv] += src*cv_volume[icv];
-    }
-
-    if (name == "eps")    // 
-    for (int icv=0; icv<ncv; icv++)
-    {
-      double src = eps[icv]/kine[icv]*(ceps1*calcTurbProd(icv) - ceps2*rho[icv]*eps[icv]);
-      rhs[icv] += src*cv_volume[icv];
-    }
-  }
-
   virtual void sourceHookScalarRansTurb_new(double *rhs, double *A, const string &name, int flagImplicit)
   {
     if (name == "kine")     // Pk - rho*eps
-    for (int icv=0; icv<ncv; icv++)
-    {
-      double src = calcTurbProd(icv)-rho[icv]*eps[icv];
-      rhs[icv] += src*cv_volume[icv];
-    }
+      for (int icv=0; icv<ncv; icv++)
+      {
+        double src = calcTurbProd(icv)-rho[icv]*eps[icv];
+        rhs[icv] += src*cv_volume[icv];
+
+        if (flagImplicit)
+        {
+          double dsrcdphi = eps[icv]/kine[icv];
+          int noc00 = nbocv_i[icv];
+          A[noc00] += dsrcdphi*cv_volume[icv];
+        }
+      }
 
     if (name == "eps")    //
-    for (int icv=0; icv<ncv; icv++)
-    {
-      double src = eps[icv]/kine[icv]*(ceps1*calcTurbProd(icv) - ceps2*rho[icv]*eps[icv]);
-      rhs[icv] += src*cv_volume[icv];
-    }
+      for (int icv=0; icv<ncv; icv++)
+      {
+        double TS = calcTurbTimeScale(kine[icv], eps[icv], strMag[icv], calcMuLam(icv)/rho[icv], 1);
+        double src = (ceps1*calcTurbProd(icv) - ceps2*rho[icv]*eps[icv])/TS;
+        rhs[icv] += src*cv_volume[icv];
 
-    if (A!=NULL)
+        if (flagImplicit)
+        {
+          double dsrcdphi = ceps2/TS;
+          int noc00 = nbocv_i[icv];
+          A[noc00] += dsrcdphi*cv_volume[icv];
+        }
+      }
+  }
+
+  virtual void boundaryHookScalarRansTurb(double *phi_fa, FaZone *zone, const string &name)
+  {
+    if (zone->getKind() == FA_ZONE_BOUNDARY)
     {
-      if (mpi_rank==0)
-        cerr << "implizit part for sourceHookScalarRansTurb_new in keps not implemented yet!" << endl;
-      throw(-1);
+      Param *param;
+      if (getParam(param, zone->getName()))
+        if ((param->getString() == "WALL") && (name == "eps"))
+        {
+          for (int ifa=zone->ifa_f; ifa<=zone->ifa_l; ifa++)
+          {
+            int icv = cvofa[ifa][0];
+
+            double nVec[3], s_half[3];
+            normVec3d(nVec,fa_normal[ifa]);
+            vecMinVec3d(s_half, x_fa[ifa], x_cv[icv]);
+            double wallDist = fabs(vecDotVec3d(s_half, nVec));
+            double muLamCV = calcMuLam(icv);
+            phi_fa[ifa] = 2.0*muLamCV*kine[icv]/(rho[icv]*wallDist*wallDist);
+          }
+        }
     }
   }
+
+
 };
 
 

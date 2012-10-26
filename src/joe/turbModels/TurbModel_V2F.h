@@ -240,21 +240,6 @@ public:
     return LengthScale;
   }
 
-  virtual void calcRsBoussinesq()
-  {
-    for (int icv = 0; icv < ncv; icv++)
-    {
-      double term1 = (2.0/3.0) * rho[icv] * kine[icv];
-      // build Reynolds Stress tensor according to compressible formulation written above
-      rij_diag[icv][0] = -term1 + muT[icv] * 2.0 * (grad_u[icv][0][0] - 1.0/3.0*diverg[icv]);
-      rij_diag[icv][1] = -term1 + muT[icv] * 2.0 * (grad_u[icv][1][1] - 1.0/3.0*diverg[icv]);
-      rij_diag[icv][2] = -term1 + muT[icv] * 2.0 * (grad_u[icv][2][2] - 1.0/3.0*diverg[icv]);
-      rij_offdiag[icv][0] =     + muT[icv] * (grad_u[icv][0][1] + grad_u[icv][1][0]);
-      rij_offdiag[icv][1] =     + muT[icv] * (grad_u[icv][0][2] + grad_u[icv][2][0]);
-      rij_offdiag[icv][2] =     + muT[icv] * (grad_u[icv][1][2] + grad_u[icv][2][1]);
-    }
-  }
-
   double getTurbProd(int icv, int realizable)
   {
     double mu_t = C_MU*rho[icv]*v2[icv]*calcTurbTimeScale(kine[icv], eps[icv], v2[icv], strMag[icv], calcMuLam(icv)/rho[icv], realizable);
@@ -393,6 +378,21 @@ public:
     }
   }
 
+  virtual void finalHookScalarRansTurbModel()
+  {
+    if (mpi_rank == 0) cout << "calcRsBoussinesq()" << endl;
+    for (int icv = 0; icv < ncv; icv++)
+    {
+      double term1 = (2.0/3.0) * rho[icv] * kine[icv];
+      // build Reynolds Stress tensor according to compressible formulation written above
+      rij_diag[icv][0] = -term1 + muT[icv] * 2.0 * (grad_u[icv][0][0] - 1.0/3.0*diverg[icv]);
+      rij_diag[icv][1] = -term1 + muT[icv] * 2.0 * (grad_u[icv][1][1] - 1.0/3.0*diverg[icv]);
+      rij_diag[icv][2] = -term1 + muT[icv] * 2.0 * (grad_u[icv][2][2] - 1.0/3.0*diverg[icv]);
+      rij_offdiag[icv][0] =     + muT[icv] * (grad_u[icv][0][1] + grad_u[icv][1][0]);
+      rij_offdiag[icv][1] =     + muT[icv] * (grad_u[icv][0][2] + grad_u[icv][2][0]);
+      rij_offdiag[icv][2] =     + muT[icv] * (grad_u[icv][1][2] + grad_u[icv][2][1]);
+    }
+  }
 };
 
 
