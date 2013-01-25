@@ -672,10 +672,10 @@
       else 
         call int_er_gt_one(eta_r,eta_f,oma,sqamth,phis,bets,chis,phi1,bet1,chi1)
       end if
-      struc_weight = exp(-1000.0_dp*abs(eta_r - one)**2.0_dp)
-      !phis = phis*(1 - struc_weight) + phi1*(struc_weight)
-      bets = bets*(1 - struc_weight) + bet1*(struc_weight)
-      chis = chis*(1 - struc_weight) + chi1*(struc_weight)
+      struc_weight = exp(-100.0_dp*abs(eta_r - one)**2.0_dp)
+      !phis = phis*(one - struc_weight) + phi1*(struc_weight)
+      bets = bets*(one - struc_weight) + bet1*(struc_weight)
+      chis = chis*(one - struc_weight) + chi1*(struc_weight)
     end if
    
     ! compute phi, chi, bet
@@ -692,7 +692,9 @@
       !a(1,2) = a(1,2)*(one - 1.5_dp*(trace_aa - third))**0.1_dp
       !a(2,1) = a(1,2)
     end if
-    
+    struc_weight = exp(-100.0_dp*abs(eta_r - one)**2.0_dp)
+    bet = bet*(one - struc_weight) + bet1*(struc_weight)
+
     ! compute helical scalar
     scl_g = 2.0_dp*phi*(one - phi)/(one + chi)
     if (scl_g < zero) scl_g = zero

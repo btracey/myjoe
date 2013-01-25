@@ -129,6 +129,65 @@ public:
     MPI_Barrier(mpi_comm);
   }
 
+  /*
+   * write all values, WARNING: should be used only for small grids.
+   */
+  void writeAllValues()
+  {
+    FILE *fp;
+    if ( mpi_rank ==0)
+    {
+      if ( (fp = fopen("flowfield.txt", "wt")) == NULL)
+      {
+        cout << "Error: cannot open file flowfield.txt" << endl;
+        throw(-1);
+      }
+    }
+    else
+    {
+      int dummy;
+      MPI_Status status;
+      MPI_Recv(&dummy,1,MPI_INT,mpi_rank-1,123,mpi_comm,&status);
+      if ( (fp = fopen("flowfield.txt", "a")) == NULL)
+      {
+        cout << "Error: cannot open file flowfield.txt" << endl;
+        throw(-1);
+      }
+    }
+
+    for (int icv = 0; icv < ncv; icv++)
+    {
+      fprintf(fp, "%.8le\t%.8le\t%.8le\t%.8le\t%.8le\t%.8le\t",
+          x_cv[icv][0], x_cv[icv][1], rho[icv], rhou[icv][0], rhou[icv][1],press[icv]);
+
+      for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
+        fprintf(fp, "%.8le\t", data->phi[icv]);
+
+      fprintf(fp, "%.8le\t", InterpolateAtCellCenterFromFaceValues(mul_fa, icv));
+
+      fprintf(fp, "%.8le\t", grad_u[icv][0][1]);
+
+      double *muT = getR1("muT");
+      fprintf(fp, "%.8le\t", muT[icv]);
+
+      // Reynolds stresses
+      fprintf(fp, "%.8le\t", rij_diag[icv][0]);
+      fprintf(fp, "%.8le\t", rij_diag[icv][1]);
+      fprintf(fp, "%.8le\t", rij_diag[icv][2]);
+      fprintf(fp, "%.8le\t", rij_offdiag[icv][0]);
+
+      fprintf(fp, "\n");
+    }
+    fclose(fp);
+
+    if ( mpi_rank < mpi_size-1)
+    {
+      int dummy = 1;
+      MPI_Send(&dummy,1,MPI_INT,mpi_rank+1,123,mpi_comm);
+    }
+    MPI_Barrier(mpi_comm);
+  }
+
   void transformMeshHook()
   {
     if (!checkParam("TRANSFORM_MESH")) return;
@@ -144,7 +203,7 @@ public:
 
   virtual void temporalHook()
   {
-    if (step%100 == 0)
+    if (step%1000 == 0)
     {
       for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
         if (zone->getKind() == FA_ZONE_BOUNDARY)
@@ -417,19 +476,34 @@ public:
       }
     }
   }
+
+  virtual void finalHook()
+  {
+    // Extract all data
+    writeAllValues();
+
+    for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+      if (zone->getKind() == FA_ZONE_BOUNDARY)
+      {
+        Param *param;
+        if (getParam(param, zone->getName()))
+          if (param->getString() == "WALL")
+            writeWallValues(zone->getName());
+      }
+  }
 };
 
 /*
  * Flat channel with periodic bc's, V2F
  */
-class PerChanV2F: public MyJoeASBM{
+class PerChanV2F: public MyJoeV2F{
 protected:
   int    nn;             // number of nodes in input profile
   int    nval;           // number of variables in input profile
   double **boundVal;     // holder for input profile data
 
 public:
-  PerChanV2F(char *name) : MyJoeASBM(name), UgpWithCvCompFlow(name)
+  PerChanV2F(char *name) : MyJoeV2F(name), UgpWithCvCompFlow(name)
   {
     if (mpi_rank == 0) cout << "PerChanV2F()" << endl;
     boundVal = NULL;
@@ -529,6 +603,7 @@ public:
 
   void sourceHook(double *rhs_rho, double (*rhs_rhou)[3], double *rhs_rhoE, double (*A)[5][5]){
     double grav  = getDoubleParam("grav",  "1.00");
+
     for (int icv = 0; icv < ncv; icv++){
         rhs_rhou[icv][0] += rho[icv]*cv_volume[icv]*grav;
         rhs_rhoE[icv] += rhou[icv][0]*cv_volume[icv]*grav;
@@ -540,6 +615,20 @@ public:
     }
   }
 
+  virtual void finalHook()
+  {
+    // Extract all data
+    writeAllValues();
+
+    for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+      if (zone->getKind() == FA_ZONE_BOUNDARY)
+      {
+        Param *param;
+        if (getParam(param, zone->getName()))
+          if (param->getString() == "WALL")
+            writeWallValues(zone->getName());
+      }
+  }
 };
 
 /*
@@ -903,66 +992,9 @@ public:
     wallD->clearFlag();
   }
 
-  void extractturbprofile()
-  {
-    FILE *fp;
-    if ( mpi_rank ==0)
-    {
-      if ( (fp = fopen("KOMSST_profile.txt", "wt")) == NULL)
-      {
-        cout << "Error: cannot open file KOMSST_profile.txt" << endl;
-        throw(-1);
-      }
-    }
-    else
-    {
-      int dummy;
-      MPI_Status status;
-      MPI_Recv(&dummy,1,MPI_INT,mpi_rank-1,123,mpi_comm,&status);
-      if ( (fp = fopen("KOMSST_profile.txt", "a")) == NULL)
-      {
-        cout << "Error: cannot open file KOMSST_profile.txt" << endl;
-        throw(-1);
-      }
-    }
-
-    for (int icv = 0; icv < ncv; icv++)
-    {
-      fprintf(fp, "%.8le\t%.8le\t%.8le\t%.8le\t%.8le\t%.8le\t",
-          x_cv[icv][0], x_cv[icv][1], rho[icv], rhou[icv][0], rhou[icv][1],press[icv]);
-
-      for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
-        fprintf(fp, "%.8le\t", data->phi[icv]);
-
-      fprintf(fp, "%.8le\t", InterpolateAtCellCenterFromFaceValues(mul_fa, icv));
-
-      fprintf(fp, "%.8le\t", grad_u[icv][0][1]);
-
-      double *muT = getR1("muT");
-      fprintf(fp, "%.8le\t", muT[icv]);
-
-      // Reynolds stresses
-      fprintf(fp, "%.8le\t", rij_diag[icv][0]);
-      fprintf(fp, "%.8le\t", rij_diag[icv][1]);
-      fprintf(fp, "%.8le\t", rij_diag[icv][2]);
-
-      fprintf(fp, "%.8le\t", rij_offdiag[icv][0]);
-
-      fprintf(fp, "\n");
-    }
-    fclose(fp);
-
-    if ( mpi_rank < mpi_size-1)
-    {
-      int dummy = 1;
-      MPI_Send(&dummy,1,MPI_INT,mpi_rank+1,123,mpi_comm);
-    }
-    MPI_Barrier(mpi_comm);
-  }
-
   virtual void finalHook()
   {
-    extractturbprofile();
+    writeAllValues();
 
     for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
       if (zone->getKind() == FA_ZONE_BOUNDARY)
@@ -1265,70 +1297,13 @@ public:
       x_no[ino][0] *= scl_mesh;
 
     // clearFlag for wall distance to recompute the wallDist when mesh deformed
-    DoubleScalar *wallD = getScalarData("wallDist");
-    wallD->clearFlag();
-  }
-
-  void extractturbprofile()
-  {
-    FILE *fp;
-    if ( mpi_rank ==0)
-      {
-        if ( (fp = fopen("V2F_profile.txt", "wt")) == NULL)
-          {
-            cout << "Error: cannot open file V2F_profile.txt" << endl;
-            throw(-1);
-          }
-      }
-    else
-      {
-        int dummy;
-        MPI_Status status;
-        MPI_Recv(&dummy,1,MPI_INT,mpi_rank-1,123,mpi_comm,&status);
-        if ( (fp = fopen("V2F_profile.txt", "a")) == NULL)
-          {
-            cout << "Error: cannot open file V2F_profile.txt" << endl;
-            throw(-1);
-          }
-      }
-
-    for (int icv = 0; icv < ncv; icv++)
-      {
-        fprintf(fp, "%.8le\t%.8le\t%.8le\t%.8le\t%.8le\t%.8le\t",
-            x_cv[icv][0], x_cv[icv][1], rho[icv], rhou[icv][0], rhou[icv][1],press[icv]);
-
-        for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
-          fprintf(fp, "%.8le\t", data->phi[icv]);
-
-        fprintf(fp, "%.8le\t", InterpolateAtCellCenterFromFaceValues(mul_fa, icv));
-
-        fprintf(fp, "%.8le\t", grad_u[icv][0][1]);
-
-        double *muT = getR1("muT");
-        fprintf(fp, "%.8le\t", muT[icv]);
-
-        // Reynolds stresses
-        fprintf(fp, "%.8le\t", rij_diag[icv][0]);
-        fprintf(fp, "%.8le\t", rij_diag[icv][1]);
-        fprintf(fp, "%.8le\t", rij_diag[icv][2]);
-
-        fprintf(fp, "%.8le\t", rij_offdiag[icv][0]);
-
-        fprintf(fp, "\n");
-      }
-    fclose(fp);
-
-    if ( mpi_rank < mpi_size-1)
-      {
-        int dummy = 1;
-        MPI_Send(&dummy,1,MPI_INT,mpi_rank+1,123,mpi_comm);
-      }
-    MPI_Barrier(mpi_comm);
+    //DoubleScalar *wallD = getScalarData("wallDist");
+    //wallD->clearFlag();
   }
 
   virtual void finalHook()
   {
-    extractturbprofile();
+    writeAllValues();
 
     for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
       if (zone->getKind() == FA_ZONE_BOUNDARY)
@@ -1342,22 +1317,22 @@ public:
 };
 
 /*
- * Flat channel with periodic bc's, SST
+ * Flat channel with inlet and outlet bcs, SST
  */
-class PerHumpSST: public MyJoeSST{
+class NonPerChanSST: public MyJoeSST{
 protected:
   int    nn;             // number of nodes in input profile
   int    nval;           // number of variables in input profile
   double **boundVal;     // holder for input profile data
 
 public:
-  PerHumpSST(char *name) : MyJoeSST(name), UgpWithCvCompFlow(name)
+  NonPerChanSST(char *name) : MyJoeSST(name), UgpWithCvCompFlow(name)
   {
-    if (mpi_rank == 0) cout << "PerHumpSST()" << endl;
+    if (mpi_rank == 0) cout << "NonPerChanSST()" << endl;
     boundVal = NULL;
   }
 
-  virtual ~PerHumpSST()
+  virtual ~NonPerChanSST()
   {
     if (boundVal != NULL) delete []boundVal;
   }
@@ -1366,30 +1341,29 @@ public:
   {
     JoeWithModels::initialHook();
 
+    // Read inlet variable profile
+    // file has variables y, rho, u, v, press, ...
+    FILE *ifile;
+    if ((ifile=fopen("./profiles.dat", "rt")) == NULL)
+    {
+      cout << "could not open profiles.dat, apply boundary from input file" << endl;
+      throw(-1);
+    }
+
+    fscanf(ifile, "n=%d\td=%d", &nn, &nval);
+    boundVal = new double *[nn];
+    for (int i = 0; i < nn; i++)
+      boundVal[i] = new double [nval];
+
+    for (int i=0; i<nn; i++)
+      for (int v = 0; v < nval; v++)
+        fscanf(ifile, "%lf", &boundVal[i][v]);
+
+    fclose(ifile);
+
+    // Specify initial condition over whole flow
     if (checkParam("SET_INIT_PROFILE"))
     {
-      // Read inlet variable profile
-      // file has variables y, rho, u, v, press, ...
-      FILE *ifile;
-      if ((ifile=fopen("./profiles.dat", "rt")) == NULL)
-      {
-        cout << "could not open profiles.dat, apply boundary from input file" << endl;
-        throw(-1);
-      }
-
-      fscanf(ifile, "n=%d\td=%d", &nn, &nval);
-      boundVal = new double *[nn];
-      for (int i = 0; i < nn; i++)
-        boundVal[i] = new double [nval];
-
-      for (int i=0; i<nn; i++)
-        for (int v = 0; v < nval; v++)
-          fscanf(ifile, "%lf", &boundVal[i][v]);
-
-      fclose(ifile);
-
-      // Specify initial condition over whole flow
-
       if(!checkDataFlag(rho))
       {
         for (int icv=0; icv<ncv; icv++)
@@ -1439,39 +1413,154 @@ public:
     }
   }
 
-  void sourceHook(double *rhs_rho, double (*rhs_rhou)[3], double *rhs_rhoE, double (*A)[5][5])
+  virtual void boundaryHook(double *T_input, double (*vel_input)[3], double *p_input, FaZone *zone)
   {
-    double grav  = getDoubleParam("GRAV",  "1.00");
-    for (int icv = 0; icv < ncv; icv++)
+    if (zone->getNameString() == getStringParam("INLET_NAME"))
     {
-      rhs_rhou[icv][0] += rho[icv]*cv_volume[icv]*grav;
-      rhs_rhoE[icv] += rhou[icv][0]*cv_volume[icv]*grav;
+      double u_bc[3], T_bc, p_bc, rho_bc, gamma_bc, c_bc, s_bc;
+      gamma_bc = 1.4;
+      double gm1 = gamma_bc - 1.0;
+      double ovgm1 = 1.0/gm1;
 
-      if (A != NULL){
-        A[nbocv_i[icv]][1][0] -= cv_volume[icv]*grav;
-        A[nbocv_i[icv]][4][1] -= cv_volume[icv]*grav;
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+        double f;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   f = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) f = 0.0;
+        else    f = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+        double uvel1 = boundVal[pos-1][2];
+        double uvel2 = boundVal[pos][2];
+        u_bc[0] = uvel1 + f*(uvel2 - uvel1);
+
+        double vvel1 = boundVal[pos-1][3];
+        double vvel2 = boundVal[pos][3];
+        u_bc[1] = 0.0; //vvel1 + f*(vvel2 - vvel1);
+        u_bc[2] = 0.0;
+
+        double press1 = boundVal[pos-1][4];
+        double press2 = boundVal[pos][4];
+        p_bc = press1 + f*(press2-press1);
+
+        double temp1 = press1/(boundVal[pos-1][1]*R_gas);
+        double temp2 = press2/(boundVal[pos][1]*R_gas);
+        T_bc = temp1 + f*(temp2-temp1);
+
+        rho_bc = p_bc/(R_gas*T_bc);
+        c_bc = sqrt(gamma_bc*p_bc/rho_bc);
+        s_bc = pow(rho_bc,gamma_bc)/p_bc;
+
+        int icv0 = cvofa[ifa][0];
+        assert( icv0 >= 0 );
+
+        double nVec[3];
+        double area = normVec3d(nVec, fa_normal[ifa]);
+
+        //Compute normal velocity of freestream
+        double qn_bc = vecDotVec3d(nVec,u_bc);
+
+        //Subtract from normal velocity of mesh
+        double vn_bc = qn_bc;// - normalvel_bfa[ifa];
+
+        //Compute normal velocity of internal cell
+        double qne = vecDotVec3d(nVec,vel[icv0]);
+
+        //Compute speed of sound in internal cell
+        double ce = sqrt(gamma[icv0]*press[icv0]/rho[icv0]);
+
+        double ac1, ac2;
+
+        //Compute the Riemann invariants in the halo cell
+        if (vn_bc > -c_bc)           // Outflow or subsonic inflow.
+          ac1 = qne   + 2.0*ovgm1*ce;
+        else                     // Supersonic inflow.
+          ac1 = qn_bc + 2.0*ovgm1*c_bc;
+
+
+        if(vn_bc > c_bc)             // Supersonic outflow.
+          ac2 = qne   - 2.0*ovgm1*ce;
+        else                     // Inflow or subsonic outflow.
+          ac2 = qn_bc - 2.0*ovgm1*c_bc;
+
+
+        double qnf = 0.5*(ac1 + ac2);
+        double cf  = 0.25*(ac1 - ac2)*gm1;
+
+        double velf[3], sf;
+
+        if (vn_bc > 0)                                                       // Outflow
+        {
+          for (int i=0; i<3; i++)
+            velf[i] = vel[icv0][i] + (qnf - qne)*nVec[i];
+          sf = pow( rho[icv0], gamma[icv0])/press[icv0];
+        }
+        else                                                                 // Inflow
+        {
+          for (int i=0; i<3; i++)
+            velf[i] = u_bc[i] + (qnf - qn_bc)*nVec[i];
+          sf = s_bc;
+        }
+        //Compute density, pressure and velocity at boundary face
+        double rho_int = pow( (sf*cf*cf/gamma[icv0]), ovgm1);
+        for (int i=0; i<3; i++)
+          vel_input[ifa][i] = velf[i];
+        p_input[ifa] = rho_int*cf*cf/gamma[icv0];
+        T_input[ifa] = p_input[ifa]/(R_gas*rho_int);
       }
     }
   }
 
-  virtual void temporalHook()
+  virtual void boundaryHookScalarRansTurb(double *phi_ph, FaZone *zone, const string &name)
   {
-    if (step%10000 == 0)
+    RansTurbKOmSST::boundaryHookScalarRansTurb(phi_ph, zone, name);
+
+    Param *param;
+
+    if ((name == "kine") && (zone->getNameString() == getStringParam("INLET_NAME")))
     {
-      //calcRsBoussinesq();
-      for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
-        if (zone->getKind() == FA_ZONE_BOUNDARY)
-        {
-          Param *param;
-          if (getParam(param, zone->getName()))
-            if (param->getString() == "WALL")
-              writeWallValues(zone->getName());
-        }
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+        double f;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   f = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) f = 0.0;
+        else    f = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+        double kine1 = boundVal[pos-1][5];
+        double kine2 = boundVal[pos][5];
+        phi_ph[ifa] = kine1 + f*(kine2-kine1);
+      }
+    }
+
+    if ((name == "omega") && (zone->getNameString() == getStringParam("INLET_NAME")))
+    {
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+        double f;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   f = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) f = 0.0;
+        else    f = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+        double omega1 = boundVal[pos-1][6];
+        double omega2 = boundVal[pos][6];
+        phi_ph[ifa] =  (omega1 + f*(omega2-omega1));
+      }
     }
   }
 
   virtual void finalHook()
   {
+    // Extract all data
+    //writeAllValues();
+
     for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
       if (zone->getKind() == FA_ZONE_BOUNDARY)
       {
@@ -1484,22 +1573,22 @@ public:
 };
 
 /*
- * Flat channel with periodic bc's, V2F
+ * Flat channel with inlet and outlet bc's, V2F
  */
-class PerHumpV2F: public MyJoeV2F{
+class NonPerChanV2F: public MyJoeV2F{
 protected:
   int    nn;             // number of nodes in input profile
   int    nval;           // number of variables in input profile
   double **boundVal;     // holder for input profile data
 
 public:
-  PerHumpV2F(char *name) : MyJoeV2F(name), UgpWithCvCompFlow(name)
+  NonPerChanV2F(char *name) : MyJoeV2F(name), UgpWithCvCompFlow(name)
   {
-    if (mpi_rank == 0) cout << "PerHumpSST()" << endl;
+    if (mpi_rank == 0) cout << "NonPerChanV2F()" << endl;
     boundVal = NULL;
   }
 
-  virtual ~PerHumpV2F()
+  virtual ~NonPerChanV2F()
   {
     if (boundVal != NULL) delete []boundVal;
   }
@@ -1567,17 +1656,17 @@ public:
           rhoE[icv] = press[icv]/(gamma[icv]-1.0) + 0.5/rho[icv]*vecDotVec3d(rhou[icv],rhou[icv]) +
               rho[icv]*kine[icv];
 
-          double eps1 = boundVal[pos-1][6];
+          /*double eps1 = boundVal[pos-1][6];
           double eps2 = boundVal[pos][6];
-          eps[icv] = eps1+fi*(eps2-eps1);
+          eps[icv] = eps1+fi*(eps2-eps1);*/
 
-          double v21 = boundVal[pos-1][7];
+          /*double v21 = boundVal[pos-1][7];
           double v22 = boundVal[pos][7];
-          v2[icv] = v21 + fi*(v22 - v21);
+          v2[icv] = v21 + fi*(v22 - v21);*/
 
-          double f1 = boundVal[pos-1][8];
+          /*double f1 = boundVal[pos-1][8];
           double f2 = boundVal[pos][8];
-          f[icv] = f1 + fi*(f2 - f1);
+          f[icv] = f1 + fi*(f2 - f1);*/
         }
 
         updateCvData(rhou, REPLACE_ROTATE_DATA);
@@ -1591,52 +1680,188 @@ public:
     }
   }
 
-  void sourceHook(double *rhs_rho, double (*rhs_rhou)[3], double *rhs_rhoE, double (*A)[5][5])
+  virtual void boundaryHook(double *T_input, double (*vel_input)[3], double *p_input, FaZone *zone)
   {
-    double grav  = getDoubleParam("GRAV",  "1.00");
-    for (int icv = 0; icv < ncv; icv++)
+    if (zone->getNameString() == getStringParam("INLET_NAME"))
     {
-      rhs_rhou[icv][0] += rho[icv]*cv_volume[icv]*grav;
-      rhs_rhoE[icv] += rhou[icv][0]*cv_volume[icv]*grav;
+      double u_bc[3], T_bc, p_bc, rho_bc, gamma_bc, c_bc, s_bc;
+      gamma_bc = 1.4;
+      double gm1 = gamma_bc - 1.0;
+      double ovgm1 = 1.0/gm1;
 
-      if (A != NULL){
-        A[nbocv_i[icv]][1][0] -= cv_volume[icv]*grav;
-        A[nbocv_i[icv]][4][1] -= cv_volume[icv]*grav;
-      }
-    }
-  }
-
-  virtual void temporalHook()
-  {
-    if (step%10000 == 0)
-    {
-      //calcRsBoussinesq();
-      for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
-        if (zone->getKind() == FA_ZONE_BOUNDARY)
-        {
-          Param *param;
-          if (getParam(param, zone->getName()))
-            if (param->getString() == "WALL")
-              writeWallValues(zone->getName());
-        }
-    }
-  }
-
-  virtual void finalHook()
-  {
-    for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
-      if (zone->getKind() == FA_ZONE_BOUNDARY)
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
       {
-        Param *param;
-        if (getParam(param, zone->getName()))
-          if (param->getString() == "WALL")
-            writeWallValues(zone->getName());
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+        double f;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   f = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) f = 0.0;
+        else    f = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+        double uvel1 = boundVal[pos-1][2];
+        double uvel2 = boundVal[pos][2];
+        u_bc[0] = uvel1 + f*(uvel2 - uvel1);
+
+        double vvel1 = boundVal[pos-1][3];
+        double vvel2 = boundVal[pos][3];
+        u_bc[1] = 0.0; //vvel1 + f*(vvel2 - vvel1);
+        u_bc[2] = 0.0;
+
+        double press1 = boundVal[pos-1][4];
+        double press2 = boundVal[pos][4];
+        p_bc = press1 + f*(press2-press1);
+
+        double temp1 = press1/(boundVal[pos-1][1]*R_gas);
+        double temp2 = press2/(boundVal[pos][1]*R_gas);
+        T_bc = temp1 + f*(temp2-temp1);
+
+        rho_bc = p_bc/(R_gas*T_bc);
+        c_bc = sqrt(gamma_bc*p_bc/rho_bc);
+        s_bc = pow(rho_bc,gamma_bc)/p_bc;
+
+        int icv0 = cvofa[ifa][0];
+        assert( icv0 >= 0 );
+
+        double nVec[3];
+        double area = normVec3d(nVec, fa_normal[ifa]);
+
+        //Compute normal velocity of freestream
+        double qn_bc = vecDotVec3d(nVec,u_bc);
+
+        //Subtract from normal velocity of mesh
+        double vn_bc = qn_bc;// - normalvel_bfa[ifa];
+
+        //Compute normal velocity of internal cell
+        double qne = vecDotVec3d(nVec,vel[icv0]);
+
+        //Compute speed of sound in internal cell
+        double ce = sqrt(gamma[icv0]*press[icv0]/rho[icv0]);
+
+        double ac1, ac2;
+
+        //Compute the Riemann invariants in the halo cell
+        if (vn_bc > -c_bc)           // Outflow or subsonic inflow.
+          ac1 = qne   + 2.0*ovgm1*ce;
+        else                     // Supersonic inflow.
+          ac1 = qn_bc + 2.0*ovgm1*c_bc;
+
+
+        if(vn_bc > c_bc)             // Supersonic outflow.
+          ac2 = qne   - 2.0*ovgm1*ce;
+        else                     // Inflow or subsonic outflow.
+          ac2 = qn_bc - 2.0*ovgm1*c_bc;
+
+
+        double qnf = 0.5*(ac1 + ac2);
+        double cf  = 0.25*(ac1 - ac2)*gm1;
+
+        double velf[3], sf;
+
+        if (vn_bc > 0)                                                       // Outflow
+        {
+          for (int i=0; i<3; i++)
+            velf[i] = vel[icv0][i] + (qnf - qne)*nVec[i];
+          sf = pow( rho[icv0], gamma[icv0])/press[icv0];
+        }
+        else                                                                 // Inflow
+        {
+          for (int i=0; i<3; i++)
+            velf[i] = u_bc[i] + (qnf - qn_bc)*nVec[i];
+          sf = s_bc;
+        }
+        //Compute density, pressure and velocity at boundary face
+        double rho_int = pow( (sf*cf*cf/gamma[icv0]), ovgm1);
+        for (int i=0; i<3; i++)
+          vel_input[ifa][i] = velf[i];
+        p_input[ifa] = rho_int*cf*cf/gamma[icv0];
+        T_input[ifa] = p_input[ifa]/(R_gas*rho_int);
       }
+    }
+  }
+
+  virtual void boundaryHookScalarRansTurb(double *phi_ph, FaZone *zone, const string &name)
+  {
+    RansTurbV2F::boundaryHookScalarRansTurb(phi_ph, zone, name);
+
+    Param *param;
+
+    if ((name == "kine") && (zone->getNameString() == getStringParam("INLET_NAME")))
+    {
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+        double fi;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
+        else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+        double kine1 = boundVal[pos-1][5];
+        double kine2 = boundVal[pos][5];
+        phi_ph[ifa] = kine1 + fi*(kine2-kine1);
+      }
+    }
+
+    if ((name == "eps") && (zone->getNameString() == getStringParam("INLET_NAME")))
+    {
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+        double fi;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
+        else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+        double eps1 = boundVal[pos-1][6];
+        double eps2 = boundVal[pos][6];
+        phi_ph[ifa] =  (eps1 + fi*(eps2-eps1));
+      }
+    }
+    if ((name == "v2") && (zone->getNameString() == getStringParam("INLET_NAME")))
+    {
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+        double fi;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
+        else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+        double v21 = boundVal[pos-1][7];
+        double v22 = boundVal[pos][7];
+        phi_ph[ifa] =  (v21 + fi*(v22-v21));
+      }
+    }
+    if ((name == "f") && (zone->getNameString() == getStringParam("INLET_NAME")))
+    {
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+        double fi;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
+        else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+        double f1 = boundVal[pos-1][8];
+        double f2 = boundVal[pos][8];
+        phi_ph[ifa] =  (f1 + fi*(f2-f1));
+      }
+    }
   }
 };
 
 
-
+/*
+ * Main Main Main Main Main Main
+ */
 int main(int argc, char *argv[])
 {
   MPI_Init(&argc, &argv);
@@ -1677,19 +1902,19 @@ int main(int argc, char *argv[])
     
     switch (run)
     {
-    case 0:   joe = new MyJoe(inputFileName);        break;
-    case 1:   joe = new MyJoeSA(inputFileName);      break;
-    case 2:   joe = new MyJoeSST(inputFileName);     break;
-    case 3:   joe = new MyJoeWX(inputFileName);      break;
-    case 4:   joe = new MyJoeKEps(inputFileName);    break;
-    case 5:   joe = new MyJoeV2F(inputFileName);     break;
-    case 6:   joe = new PerChanSST(inputFileName);   break;
-    case 7:   joe = new PerChanV2F(inputFileName);   break;
-    case 8:   joe = new PerChanKEps(inputFileName);  break;
-    case 9:   joe = new BlayerSST(inputFileName);    break;
-    case 10:  joe = new BlayerV2F(inputFileName);    break;
-    case 11:  joe = new PerHumpSST(inputFileName);   break;
-    case 12:  joe = new PerHumpV2F(inputFileName);   break;
+    case 0:   joe = new MyJoe(inputFileName);           break;
+    case 1:   joe = new MyJoeSA(inputFileName);         break;
+    case 2:   joe = new MyJoeSST(inputFileName);        break;
+    case 3:   joe = new MyJoeWX(inputFileName);         break;
+    case 4:   joe = new MyJoeKEps(inputFileName);       break;
+    case 5:   joe = new MyJoeV2F(inputFileName);        break;
+    case 6:   joe = new PerChanSST(inputFileName);      break;
+    case 7:   joe = new PerChanV2F(inputFileName);      break;
+    case 8:   joe = new PerChanKEps(inputFileName);     break;
+    case 9:   joe = new BlayerSST(inputFileName);       break;
+    case 10:  joe = new BlayerV2F(inputFileName);       break;
+    case 11:  joe = new NonPerChanSST(inputFileName);   break;
+    case 12:  joe = new NonPerChanV2F(inputFileName);   break;
     default: 
       if (mpi_rank == 0)
         cerr << "ERROR: run number not available!" << endl;

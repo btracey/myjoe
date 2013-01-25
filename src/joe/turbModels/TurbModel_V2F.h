@@ -39,7 +39,7 @@ public:
     eq->relax = getDoubleParam("RELAX_eps", "0.7");
     eq->phiZero = 1.0e-8;
     eq->phiMaxiter = 500;
-    eq->lowerBound = 1.0e-11;
+    eq->lowerBound = 1.0e-06; //1.0e-11;
     eq->upperBound = 1.0e10;
     eq->turbSchmidtNumber = SIG_D;
 
@@ -47,7 +47,7 @@ public:
     eq->relax = getDoubleParam("RELAX_v2", "0.7");
     eq->phiZero = 1.0e-9;
     eq->phiMaxiter = 500;
-    eq->lowerBound = 0.66667e-11;
+    eq->lowerBound = 1.0e-6; //0.66667e-11;
     eq->upperBound = 1.0e10;
     eq->turbSchmidtNumber = SIG_K;
 
@@ -64,7 +64,16 @@ public:
     diverg = NULL;       registerScalar(diverg, "diverg", CV_DATA);
     turbTS = NULL;       registerScalar(turbTS, "turbTS", CV_DATA);
     turbLS = NULL;       registerScalar(turbLS, "turbLS", CV_DATA);
-    muT    = NULL;       registerScalar(muT, "muT", CV_DATA);
+    muT    = NULL;       registerScalar(muT,    "muT",    CV_DATA);
+    fsrc1  = NULL;       registerScalar(fsrc1, "fsrc1", CV_DATA);
+    fsrc2  = NULL;       registerScalar(fsrc2, "fsrc2", CV_DATA);
+    fsrc3  = NULL;       registerScalar(fsrc3, "fsrc3", CV_DATA);
+    tturb = NULL; registerScalar(tturb, "tturb", CV_DATA);
+    tkol = NULL; registerScalar(tkol, "tkol", CV_DATA);
+    trel = NULL; registerScalar(trel, "trel", CV_DATA);
+    lturb = NULL; registerScalar(lturb, "lturb", CV_DATA);
+    lkol = NULL; registerScalar(lkol, "lkol", CV_DATA);
+    lrel = NULL; registerScalar(lrel, "lrel", CV_DATA);
   }
 
   virtual ~RansTurbV2F() {}
@@ -77,6 +86,7 @@ public:
   
   double C_MU, SIG_K, SIG_D, CEPS1, CEPS2, C1, C2, CETA, CL, ALPHA, ENN;
 
+  double *fsrc1, *fsrc2, *fsrc3, *tturb, *tkol, *trel, *lkol, *lrel, *lturb;
 
 public:
 
@@ -132,7 +142,9 @@ public:
     calcGradVel();
     // update strain rate tensor 
     calcStrainRateAndDivergence();
-
+    // limit v2
+    //for (int icv = 0; icv < ncv; icv++)
+    //  v2[icv] = min(v2[icv],2.0/3.0*kine[icv]);
 
     //--------------------------------
     // calculate turbulent viscosity
@@ -183,6 +195,13 @@ public:
       muT[icv] = InterpolateAtCellCenterFromFaceValues(mut_fa, icv);
       turbTS[icv] = calcTurbTimeScale(kine[icv], eps[icv], v2[icv], strMag[icv], calcMuLam(icv)/rho[icv], 1);
       turbLS[icv] = calcTurbLengthScale(kine[icv], eps[icv], v2[icv], strMag[icv], calcMuLam(icv)/rho[icv], 1);
+
+      //tturb[icv] = kine[icv]/eps[icv];
+      //tkol[icv] = 6.0*sqrt(calcMuLam(icv)/rho[icv]/eps[icv]);
+      //trel[icv] = kine[icv]/(sqrt(3.0)*v2[icv]*C_MU*strMag[icv]);
+      //lturb[icv] = CL*pow(kine[icv],1.5)/eps[icv];
+      //lkol[icv] = CL*CETA*pow(calcMuLam(icv)/rho[icv],0.75)/pow(eps[icv],0.25);
+      //lrel[icv] = pow(kine[icv],1.5)/(sqrt(3.0)*v2[icv]*C_MU*strMag[icv]);
     }
   }
 
@@ -222,7 +241,7 @@ public:
     }
   }
 
-  inline double calcTurbTimeScale(const double &kine, const double &eps, const double &v2,
+  /*inline double calcTurbTimeScale(const double &kine, const double &eps, const double &v2,
                                   const double &str, const double &nu, int realizable)
   {
     double TimeScale = max(kine/eps, 6.0*sqrt(nu/eps));
@@ -237,6 +256,34 @@ public:
     double LengthScale = CL*max(pow(kine,1.5)/eps, CETA*pow(nu,0.75)/pow(eps,0.25));
     if (realizable)
       LengthScale = min(LengthScale, pow(kine,1.5)/(sqrt(3.0)*v2*C_MU*str));
+    return LengthScale;
+  }*/
+
+  inline double calcTurbTimeScale(const double &kine, const double &eps, const double &v2,
+                                  const double &str, const double &nu, int realizable)
+  {
+    double TimeScale = kine/eps;
+    TimeScale = max(TimeScale, 6.0*sqrt(nu/eps));
+
+    if (realizable)
+      TimeScale = min(TimeScale, kine/(sqrt(3.0)*v2*C_MU*str));
+
+    //TimeScale = max(TimeScale, 6.0*sqrt(nu/eps));
+
+    return TimeScale;
+  }
+
+  inline double calcTurbLengthScale(const double &kine, const double &eps, const double &v2,
+                                    const double &str, const double &nu, int realizable)
+  {
+    double LengthScale = CL*pow(kine,1.5)/eps;
+    LengthScale = max(LengthScale, CL*CETA*pow(nu,0.75)/pow(eps,0.25));
+
+    if (realizable)
+      LengthScale = min(LengthScale, pow(kine,1.5)/(sqrt(3.0)*v2*C_MU*str));
+
+    //LengthScale = max(LengthScale, CL*CETA*pow(nu,0.75)/pow(eps,0.25));
+
     return LengthScale;
   }
 
@@ -315,6 +362,10 @@ public:
             double src  = f[icv]+1.0/TS*((C1-ENN)*v2[icv]/kine[icv]-(C1-1.0)*(2./3.)) - C2*getTurbProd(icv, 1)/(kine[icv]*rho[icv]);
             src /= -LS2;
             rhs[icv] += src*cv_volume[icv];
+
+            //fsrc1[icv] = 1.0/TS*((C1-ENN)*v2[icv]/kine[icv]-(C1-1.0)*(2./3.)) - C2*getTurbProd(icv, 1)/(kine[icv]*rho[icv]);
+            //fsrc2[icv] = -f[icv]/LS2;
+            //fsrc3[icv] = -fsrc1[icv]/LS2;
 
             if (flagImplicit)
               {

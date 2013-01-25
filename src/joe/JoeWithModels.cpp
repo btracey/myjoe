@@ -782,18 +782,10 @@ void JoeWithModels::runBackwardEuler()
       
       switch (iScal)
       {
-      case 0:
-        for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhsScal[iScal][icv];
-        break;
-      case 1:
-        for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhsScal[iScal][icv];
-        break;
-      case 2:
-        for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhsScal[iScal][icv];
-        break;
-      case 3:
-        for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhsScal[iScal][icv];
-        break;
+      case 0: for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhsScal[iScal][icv]; break;
+      case 1: for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhsScal[iScal][icv]; break;
+      case 2: for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhsScal[iScal][icv]; break;
+      case 3: for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhsScal[iScal][icv]; break;
       }
 
       solveLinSysScalar(dScal[iScal], AScal[iScal][5], rhsScal[iScal],
@@ -888,10 +880,11 @@ void JoeWithModels::runBackwardEuler()
   // output
   // ---------------------------------------------------------------------------------
 
-  temporalHook();
+  //temporalHook();
   finalHookScalarRansTurbModel();
   finalHook();
-	
+
+  writeData(step);
   writeRestart();
 
 

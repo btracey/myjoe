@@ -247,14 +247,17 @@ public:   // member functions
         wt_offdiag[icv][2] = 0.5*(grad_u[icv][1][2] - grad_u[icv][2][1])*tau;
     }
 
-    updateCvData(st_diag, REPLACE_ROTATE_DATA);
-    updateCvData(st_offdiag, REPLACE_ROTATE_DATA);
-    updateCvData(wt_offdiag, REPLACE_ROTATE_DATA);
+    for (int i = 0; i < 0; i++)
+    {
+      updateCvData(st_diag, REPLACE_ROTATE_DATA);
+      updateCvData(st_offdiag, REPLACE_ROTATE_DATA);
+      updateCvData(wt_offdiag, REPLACE_ROTATE_DATA);
 
-    // Smooth inputs
-    //smoothingVec(st_diag);
-    //smoothingVec(st_offdiag);
-    //smoothingVec(wt_offdiag);
+      // Smooth inputs
+      smoothingVec(st_diag);
+      smoothingVec(st_offdiag);
+      smoothingVec(wt_offdiag);
+    }
 
     // ====================================================================
     // Compute cell-centered Reynolds stresses
@@ -328,16 +331,31 @@ public:   // member functions
         hatst[icv] = CIR[1][2];
         ststa[icv] = CIR[2][2];
     }
-    updateCvData(etar, REPLACE_DATA);
-    updateCvData(etaf, REPLACE_DATA);
-    updateCvData(a2, REPLACE_DATA);
 
+    updateCvData(as_diag, REPLACE_ROTATE_DATA);
+    updateCvData(as_offdiag, REPLACE_ROTATE_DATA);
+    updateCvData(ar_diag, REPLACE_ROTATE_DATA);
+    updateCvData(ar_offdiag, REPLACE_ROTATE_DATA);
     updateCvData(rij_diag, REPLACE_ROTATE_DATA);
     updateCvData(rij_offdiag, REPLACE_ROTATE_DATA);
 
     // Smooth Outputs
-    smoothingVec(rij_diag);
-    smoothingVec(rij_offdiag);
+    for (int i = 0; i < 0; i++)
+    {
+      smoothingVec(as_diag);
+      smoothingVec(as_offdiag);
+      smoothingVec(ar_diag);
+      smoothingVec(ar_offdiag);
+      smoothingVec(rij_diag);
+      smoothingVec(rij_offdiag);
+
+      updateCvData(as_diag, REPLACE_ROTATE_DATA);
+      updateCvData(as_offdiag, REPLACE_ROTATE_DATA);
+      updateCvData(ar_diag, REPLACE_ROTATE_DATA);
+      updateCvData(ar_offdiag, REPLACE_ROTATE_DATA);
+      updateCvData(rij_diag, REPLACE_ROTATE_DATA);
+      updateCvData(rij_offdiag, REPLACE_ROTATE_DATA);
+    }
 
     // ====================================================================
     // Compute internal face Reynolds stresses
@@ -459,118 +477,21 @@ public:   // member functions
   void calcBlockTensor()
   {
     // =========================================================================================
-    // allocate static memory
+    // compute A_block and rhs_block
     // =========================================================================================
-
     static double *A_block   = new double[nbocv_s];
     static double *rhs_block = new double[ncv];
 
     for (int icv = 0; icv < ncv; ++icv)   rhs_block[icv] = 0.0;
     for (int noc = 0; noc < nbocv_s; noc++) A_block[noc] = 0.0;
 
-    // =========================================================================================
-    // compute A_block and rhs_block
-    // =========================================================================================
-    calcViscousFluxAuxScalar(rhs_block, A_block, bphi_bfa, grad_bphi);
-    /*
     // ..........................................................................................
-    // cycle trough internal faces first
+    // compute the viscous terms
     // ..........................................................................................
-    for (int ifa = nfa_b; ifa < nfa; ++ifa)
-    {
-      int icv0 = cvofa[ifa][0];
-      int icv1 = cvofa[ifa][1];
-      assert( icv0 >= 0 );
-      assert( icv1 >= 0 );
-
-      // viscous flux
-      double sVec[3], nVec[3];
-      double area = normVec3d(nVec, fa_normal[ifa]);
-      vecMinVec3d(sVec, x_cv[icv1], x_cv[icv0]);
-      double ds = normVec3d(sVec);
-
-      double dx0[3], dx1[3];
-      vecMinVec3d(dx0, x_fa[ifa], x_cv[icv0]);
-      vecMinVec3d(dx1, x_fa[ifa], x_cv[icv1]);
-      double w0 = sqrt(vecDotVec3d(dx0, dx0));
-      double w1 = sqrt(vecDotVec3d(dx1, dx1));
-
-      double grad_f[3], lim_grad[3];
-      for (int i = 0; i < 3; i++)
-        grad_f[i] = (w1*grad_bphi[icv0][i] + w0*grad_bphi[icv1][i])/(w0 + w1);
-      double proj_grad = vecDotVec3d(grad_f,sVec);
-      for (int i = 0; i < 3; i++)
-        lim_grad[i] = grad_f[i] - proj_grad*sVec[i];
-
-      double explVisc = (lim_grad[0]*nVec[0] + lim_grad[1]*nVec[1] + lim_grad[2]*nVec[2])*area;
-      double implVisc = vecDotVec3d(sVec, nVec)*area/ds;
-
-      // build equation system
-      int noc00, noc01, noc11, noc10;
-      getImplDependencyIndex(noc00,noc01,noc11,noc10,icv0,icv1);
-
-      A_block[noc00] += implVisc;
-      A_block[noc01] -= implVisc;
-      rhs_block[icv0] += explVisc;
-
-      if (icv1 < ncv)
-      {
-        A_block[noc11] += implVisc;
-        A_block[noc10] -= implVisc;
-        rhs_block[icv1] -= explVisc;
-      }
-    }
+    calcViscousFluxScalar_aux(rhs_block, A_block, bphi_bfa, grad_bphi);
 
     // ..........................................................................................
-    // cycle trough boundary faces
-    // ..........................................................................................
-    for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
-    {
-      if (zone->getKind() == FA_ZONE_BOUNDARY)
-      {
-        Param *param;
-        if (getParam(param, zone->getName()))
-        {
-          if (param->getString() == "WALL")
-          {
-            for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
-            {
-              int icv0 = cvofa[ifa][0];
-              assert( icv0 >= 0 );
-              int noc00 = nbocv_i[icv0];
-
-              double sVec[3], nVec[3];
-              double area = normVec3d(nVec, fa_normal[ifa]);
-              vecMinVec3d(sVec, x_fa[ifa], x_cv[icv0]);
-              double ds = normVec3d(sVec);
-
-              double proj_grad = vecDotVec3d(grad_bphi[icv0],sVec);
-              double lim_grad[3];
-              for (int i = 0; i < 3; i++)
-                lim_grad[i] = grad_bphi[icv0][i] - proj_grad*sVec[i];
-
-              double implVisc = vecDotVec3d(sVec, nVec)*area/ds;
-              double explVisc = (lim_grad[0]*nVec[0] +
-                                 lim_grad[1]*nVec[1] +
-                                 lim_grad[2]*nVec[2])*area +
-                                 bphi_bfa[ifa]*implVisc;
-              //rhs_block[icv0] += phi_asbm_bfa[ifa]*impl_coeff;
-
-              // build equation system
-              A_block[noc00] += implVisc;
-              rhs_block[icv0] += explVisc;
-            }
-          }
-          else
-          {
-            // do nothing as flux is zero
-          }
-        }
-      }
-    }*/
-
-    // ..........................................................................................
-    // cycle through cell centroids to compute source terms
+    // compute the source terms
     // ..........................................................................................
 
     /*cout << "before centroids" << endl;
@@ -592,9 +513,9 @@ public:   // member functions
       A_block[noc00] += cv_volume[icv]/(turbLS[icv]*turbLS[icv]);
     }
 
-    // =========================================================================================
+    // ..........................................................................................
     // under-relaxation
-    // =========================================================================================
+    // ..........................................................................................
     //for (int icv = 0; icv < ncv; icv++){
     //    int noc = nbocv_i[icv];
     //    A_block[noc] /= 1.0;
@@ -654,8 +575,6 @@ public:   // member functions
       myRes += fabs(thisRes);
     }
     MPI_Reduce(&myRes,&Res,1,MPI_DOUBLE,MPI_SUM,0,mpi_comm);
-
-    updateCvData(bphi, REPLACE_DATA);
 
     // output for info
     if (mpi_rank == 0)
