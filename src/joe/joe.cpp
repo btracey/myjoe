@@ -5,6 +5,7 @@
 #include "turbModels/TurbModel_KOMSST.h"
 #include "turbModels/TurbModel_SA.h"
 #include "turbModels/TurbModel_V2F.h"
+#include "turbModels/TurbModel_V2F_half.h"
 #include "turbModels/TurbModel_ASBM.h"
 #include "turbModels/TransModel_GaReT.h"
 
@@ -350,6 +351,21 @@ public:
 };
 
 /*
+ * MyJoe with half of the v2-f Model
+ */
+class MyJoeV2F_half : public MyJoe, public RansTurbV2F_half
+{
+public:
+  MyJoeV2F_half(char *name) : MyJoe(name), UgpWithCvCompFlow(name)
+  {
+    if (mpi_rank == 0)
+      cout << "MyJoeV2F_half()" << endl;
+  }
+
+  virtual ~MyJoeV2F_half() {}
+};
+
+/*
  * MyJoe with ASBM model
  */
 class MyJoeASBM : public MyJoe, public RansTurbASBM
@@ -634,14 +650,14 @@ public:
 /*
  * Flat channel with periodic bc's, KEps
  */
-class PerChanKEps: public MyJoeKEps{
+class PerChanKEps: public MyJoeASBM{
 protected:
   int    nn;             // number of nodes in input profile
   int    nval;           // number of variables in input profile
   double **boundVal;     // holder for input profile data
 
 public:
-  PerChanKEps(char *name) : MyJoeKEps(name), UgpWithCvCompFlow(name)
+  PerChanKEps(char *name) : MyJoeASBM(name), UgpWithCvCompFlow(name)
   {
     if (mpi_rank == 0) cout << "PerChanKEps()" << endl;
     boundVal = NULL;
@@ -742,6 +758,20 @@ public:
     }
   }
 
+  virtual void finalHook()
+  {
+    // Extract all data
+    writeAllValues();
+
+    for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+      if (zone->getKind() == FA_ZONE_BOUNDARY)
+      {
+        Param *param;
+        if (getParam(param, zone->getName()))
+          if (param->getString() == "WALL")
+            writeWallValues(zone->getName());
+      }
+  }
 };
 
 /*
@@ -765,174 +795,196 @@ public:
   {
     JoeWithModels::initialHook();
 
+    boundVal = NULL;
+
     // Read inlet variable profile
-    // file has variables y, rho, u, v, press, ...
-    FILE *ifile;
-    if ((ifile=fopen("./profiles.dat", "rt")) == NULL) {
-        cout << "could not open profiles.dat, apply boundary from input file" << endl;
+    if (checkParam("READ_PROFILE"))
+    {
+      FILE *ifile;
+      if ((ifile=fopen("./profiles.dat", "rt")) == NULL)
+      {
+        cout << "could not open the file profiles.dat" << endl;
         throw(-1);
+      }
+
+      fscanf(ifile, "n=%d\td=%d", &nn, &nval);
+      boundVal = new double *[nn];
+      for (int i = 0; i < nn; i++)
+        boundVal[i] = new double [nval];
+
+      // file has variables y, rho, u, v, press, ...
+      for (int i=0; i<nn; i++)
+        for (int v = 0; v < nval; v++)
+          fscanf(ifile, "%lf", &boundVal[i][v]);
+
+      fclose(ifile);
+      if (mpi_rank == 0)
+        cout << "FINISHED READING INLET PROFILE" << endl;
     }
 
-    fscanf(ifile, "n=%d\td=%d", &nn, &nval);
-    boundVal = new double *[nn];
-    for (int i = 0; i < nn; i++)
-      boundVal[i] = new double [nval];
-
-    for (int i=0; i<nn; i++)
-      for (int v = 0; v < nval; v++)
-        fscanf(ifile, "%lf", &boundVal[i][v]);
-
-    fclose(ifile);
-
     // Specify initial condition over whole flow
-    if (checkParam("SET_INIT_PROFILE")){
-        if(!checkDataFlag(rho))
-          {
-            for (int icv=0; icv<ncv; icv++)
-              {
-                int pos=1;
-                // while pos and pos-1 dont sandwich x_cv, keep increasing pos
-                while(boundVal[pos][0] < x_cv[icv][1] && (pos<nn-1))       pos++;
+    if (checkParam("SET_INIT_PROFILE"))
+    {
+      if(!checkDataFlag(rho))
+      {
+        if (boundVal == NULL)
+        {
+          if (mpi_rank == 0)
+            cerr << "Have not read profiles.dat" << endl;
+          throw(-1);
+        }
 
-                double f;
-                // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
-                if      (x_cv[icv][1] > boundVal[pos][0])    f = 1.0;
-                // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
-                else if (x_cv[icv][1] < boundVal[pos-1][0])  f = 0.0;
-                else    f = (x_cv[icv][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+        for (int icv=0; icv<ncv; icv++)
+        {
+          int pos=1;
+          // while pos and pos-1 dont sandwich x_cv, keep increasing pos
+          while(boundVal[pos][0] < x_cv[icv][1] && (pos<nn-1))       pos++;
 
-                double rho1 = boundVal[pos-1][1];
-                double rho2 = boundVal[pos][1];
-                rho[icv] = rho1+f*(rho2-rho1);
+          double f;
+          // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
+          if      (x_cv[icv][1] > boundVal[pos][0])    f = 1.0;
+          // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
+          else if (x_cv[icv][1] < boundVal[pos-1][0])  f = 0.0;
+          else    f = (x_cv[icv][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
 
-                double uvel1 = boundVal[pos-1][2];
-                double uvel2 = boundVal[pos][2];
-                rhou[icv][0] = uvel1*rho1+f*(uvel2*rho2-uvel1*rho1);
-                rhou[icv][1] = rhou[icv][2]=0.0;
+          double rho1 = boundVal[pos-1][1];
+          double rho2 = boundVal[pos][1];
+          rho[icv] = rho1+f*(rho2-rho1);
 
-                double press1 = boundVal[pos-1][4];
-                double press2 = boundVal[pos][4];
-                press[icv] = press1+f*(press2-press1);
+          double uvel1 = boundVal[pos-1][2];
+          double uvel2 = boundVal[pos][2];
+          rhou[icv][0] = uvel1*rho1+f*(uvel2*rho2-uvel1*rho1);
+          rhou[icv][1] = rhou[icv][2]=0.0;
 
-                rhoE[icv] = press[icv]/(gamma[icv]-1.0) + 0.5/rho[icv]*vecDotVec3d(rhou[icv],rhou[icv])
-                          + rho[icv]*kine[icv];
+          double press1 = boundVal[pos-1][4];
+          double press2 = boundVal[pos][4];
+          press[icv] = press1+f*(press2-press1);
 
-                double kine1 = boundVal[pos-1][5];
-                double kine2 = boundVal[pos][5];
-                kine[icv] = kine1+f*(kine2-kine1);
+          rhoE[icv] = press[icv]/(gamma[icv]-1.0) + 0.5/rho[icv]*vecDotVec3d(rhou[icv],rhou[icv])
+                      + rho[icv]*kine[icv];
 
-                double omega1 = boundVal[pos-1][6];
-                double omega2 = boundVal[pos][6];
-                omega[icv] = omega1+f*(omega2-omega1);
-              }
+          double kine1 = boundVal[pos-1][5];
+          double kine2 = boundVal[pos][5];
+          kine[icv] = kine1+f*(kine2-kine1);
 
-            updateCvData(rhou, REPLACE_ROTATE_DATA);
-            updateCvData(rho, REPLACE_DATA);
-            updateCvData(rhoE, REPLACE_DATA);
-            updateCvData(kine, REPLACE_DATA);
-            updateCvData(omega, REPLACE_DATA);
-          }
+          double omega1 = boundVal[pos-1][6];
+          double omega2 = boundVal[pos][6];
+          omega[icv] = omega1+f*(omega2-omega1);
+        }
+
+        updateCvData(rhou, REPLACE_ROTATE_DATA);
+        updateCvData(rho, REPLACE_DATA);
+        updateCvData(rhoE, REPLACE_DATA);
+        updateCvData(kine, REPLACE_DATA);
+        updateCvData(omega, REPLACE_DATA);
+      }
     }
   }
 
   virtual void boundaryHook(double *T_input, double (*vel_input)[3], double *p_input, FaZone *zone)
   {
     if (zone->getNameString() == getStringParam("INLET_NAME"))
+    {
+      if (boundVal == NULL)
       {
-        double u_bc[3], T_bc, p_bc, rho_bc, gamma_bc, c_bc, s_bc;
-        gamma_bc = 1.4;
-        double gm1 = gamma_bc - 1.0;
-        double ovgm1 = 1.0/gm1;
-
-        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
-          {
-            int pos=1;
-            while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
-
-            double f;
-            if      (x_fa[ifa][1] > boundVal[pos][0])   f = 1.0;
-            else if (x_fa[ifa][1] < boundVal[pos-1][0]) f = 0.0;
-            else    f = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
-
-            double uvel1 = boundVal[pos-1][2];
-            double uvel2 = boundVal[pos][2];
-            u_bc[0] = uvel1 + f*(uvel2 - uvel1);
-
-            double vvel1 = boundVal[pos-1][3];
-            double vvel2 = boundVal[pos][3];
-            u_bc[1] = 0.0; //vvel1 + f*(vvel2 - vvel1);
-            u_bc[2] = 0.0;
-
-            double press1 = boundVal[pos-1][4];
-            double press2 = boundVal[pos][4];
-            p_bc = press1 + f*(press2-press1);
-
-            double temp1 = press1/(boundVal[pos-1][1]*R_gas);
-            double temp2 = press2/(boundVal[pos][1]*R_gas);
-            T_bc = temp1 + f*(temp2-temp1);
-
-            rho_bc = p_bc/(R_gas*T_bc);
-            c_bc = sqrt(gamma_bc*p_bc/rho_bc);
-            s_bc = pow(rho_bc,gamma_bc)/p_bc;
-
-            int icv0 = cvofa[ifa][0];
-            assert( icv0 >= 0 );
-
-            double nVec[3];
-            double area = normVec3d(nVec, fa_normal[ifa]);
-
-            //Compute normal velocity of freestream
-            double qn_bc = vecDotVec3d(nVec,u_bc);
-
-            //Subtract from normal velocity of mesh
-            double vn_bc = qn_bc;// - normalvel_bfa[ifa];
-
-            //Compute normal velocity of internal cell
-            double qne = vecDotVec3d(nVec,vel[icv0]);
-
-            //Compute speed of sound in internal cell
-            double ce = sqrt(gamma[icv0]*press[icv0]/rho[icv0]);
-
-            double ac1, ac2;
-
-            //Compute the Riemann invariants in the halo cell
-            if (vn_bc > -c_bc)           // Outflow or subsonic inflow.
-              ac1 = qne   + 2.0*ovgm1*ce;
-            else                     // Supersonic inflow.
-              ac1 = qn_bc + 2.0*ovgm1*c_bc;
-
-
-            if(vn_bc > c_bc)             // Supersonic outflow.
-              ac2 = qne   - 2.0*ovgm1*ce;
-            else                     // Inflow or subsonic outflow.
-              ac2 = qn_bc - 2.0*ovgm1*c_bc;
-
-
-            double qnf = 0.5*(ac1 + ac2);
-            double cf  = 0.25*(ac1 - ac2)*gm1;
-
-            double velf[3], sf;
-
-            if (vn_bc > 0)                                                       // Outflow
-              {
-                for (int i=0; i<3; i++)
-                  velf[i] = vel[icv0][i] + (qnf - qne)*nVec[i];
-                sf = pow( rho[icv0], gamma[icv0])/press[icv0];
-              }
-            else                                                                 // Inflow
-              {
-                for (int i=0; i<3; i++)
-                  velf[i] = u_bc[i] + (qnf - qn_bc)*nVec[i];
-                sf = s_bc;
-              }
-            //Compute density, pressure and velocity at boundary face
-            double rho_int = pow( (sf*cf*cf/gamma[icv0]), ovgm1);
-            for (int i=0; i<3; i++)
-              vel_input[ifa][i] = velf[i];
-            p_input[ifa] = rho_int*cf*cf/gamma[icv0];
-            T_input[ifa] = p_input[ifa]/(R_gas*rho_int);
-          }
+        if (mpi_rank == 0)
+          cerr << "Have not read profiles.dat" << endl;
+        throw(-1);
       }
+
+      double u_bc[3], T_bc, p_bc, rho_bc, gamma_bc, c_bc, s_bc;
+      gamma_bc = 1.4;
+      double gm1 = gamma_bc - 1.0;
+      double ovgm1 = 1.0/gm1;
+
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+        double f;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   f = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) f = 0.0;
+        else    f = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+        double uvel1 = boundVal[pos-1][2];
+        double uvel2 = boundVal[pos][2];
+        u_bc[0] = uvel1 + f*(uvel2 - uvel1);
+
+        double vvel1 = boundVal[pos-1][3];
+        double vvel2 = boundVal[pos][3];
+        u_bc[1] = 0.0; //vvel1 + f*(vvel2 - vvel1);
+        u_bc[2] = 0.0;
+
+        double press1 = boundVal[pos-1][4];
+        double press2 = boundVal[pos][4];
+        p_bc = press1 + f*(press2-press1);
+
+        double temp1 = press1/(boundVal[pos-1][1]*R_gas);
+        double temp2 = press2/(boundVal[pos][1]*R_gas);
+        T_bc = temp1 + f*(temp2-temp1);
+
+        rho_bc = p_bc/(R_gas*T_bc);
+        c_bc = sqrt(gamma_bc*p_bc/rho_bc);
+        s_bc = pow(rho_bc,gamma_bc)/p_bc;
+
+        int icv0 = cvofa[ifa][0];
+        assert( icv0 >= 0 );
+
+        double nVec[3];
+        double area = normVec3d(nVec, fa_normal[ifa]);
+
+        //Compute normal velocity of freestream
+        double qn_bc = vecDotVec3d(nVec,u_bc);
+
+        //Subtract from normal velocity of mesh
+        double vn_bc = qn_bc;// - normalvel_bfa[ifa];
+
+        //Compute normal velocity of internal cell
+        double qne = vecDotVec3d(nVec,vel[icv0]);
+
+        //Compute speed of sound in internal cell
+        double ce = sqrt(gamma[icv0]*press[icv0]/rho[icv0]);
+
+        double ac1, ac2;
+
+        //Compute the Riemann invariants in the halo cell
+        if (vn_bc > -c_bc)           // Outflow or subsonic inflow.
+          ac1 = qne   + 2.0*ovgm1*ce;
+        else                     // Supersonic inflow.
+          ac1 = qn_bc + 2.0*ovgm1*c_bc;
+
+        if(vn_bc > c_bc)             // Supersonic outflow.
+          ac2 = qne   - 2.0*ovgm1*ce;
+        else                     // Inflow or subsonic outflow.
+          ac2 = qn_bc - 2.0*ovgm1*c_bc;
+
+
+        double qnf = 0.5*(ac1 + ac2);
+        double cf  = 0.25*(ac1 - ac2)*gm1;
+
+        double velf[3], sf;
+
+        if (vn_bc > 0)                                                       // Outflow
+        {
+          for (int i=0; i<3; i++)
+            velf[i] = vel[icv0][i] + (qnf - qne)*nVec[i];
+          sf = pow( rho[icv0], gamma[icv0])/press[icv0];
+        }
+        else                                                                 // Inflow
+        {
+          for (int i=0; i<3; i++)
+            velf[i] = u_bc[i] + (qnf - qn_bc)*nVec[i];
+          sf = s_bc;
+        }
+        //Compute density, pressure and velocity at boundary face
+        double rho_int = pow( (sf*cf*cf/gamma[icv0]), ovgm1);
+        for (int i=0; i<3; i++)
+          vel_input[ifa][i] = velf[i];
+        p_input[ifa] = rho_int*cf*cf/gamma[icv0];
+        T_input[ifa] = p_input[ifa]/(R_gas*rho_int);
+      }
+    }
   }
 
   virtual void boundaryHookScalarRansTurb(double *phi_ph, FaZone *zone, const string &name)
@@ -942,41 +994,54 @@ public:
     Param *param;
 
     if ((name == "kine") && (zone->getNameString() == getStringParam("INLET_NAME")))
+    {
+      if (boundVal == NULL)
       {
-        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
-          {
-            int pos=1;
-            while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
-
-            double f;
-            if      (x_fa[ifa][1] > boundVal[pos][0])   f = 1.0;
-            else if (x_fa[ifa][1] < boundVal[pos-1][0]) f = 0.0;
-            else    f = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
-
-            double kine1 = boundVal[pos-1][5];
-            double kine2 = boundVal[pos][5];
-            phi_ph[ifa] = kine1 + f*(kine2-kine1);
-          }
+        if (mpi_rank == 0)
+          cerr << "Have not read profiles.dat" << endl;
+        throw(-1);
       }
+
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+        double f;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   f = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) f = 0.0;
+        else    f = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+        double kine1 = boundVal[pos-1][5];
+        double kine2 = boundVal[pos][5];
+        phi_ph[ifa] = kine1 + f*(kine2-kine1);
+      }
+    }
 
     if ((name == "omega") && (zone->getNameString() == getStringParam("INLET_NAME")))
+    {
+      if (boundVal == NULL)
       {
-        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
-          {
-            int pos=1;
-            while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
-
-            double f;
-            if      (x_fa[ifa][1] > boundVal[pos][0])   f = 1.0;
-            else if (x_fa[ifa][1] < boundVal[pos-1][0]) f = 0.0;
-            else    f = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
-
-            double omega1 = boundVal[pos-1][6];
-            double omega2 = boundVal[pos][6];
-            phi_ph[ifa] =  (omega1 + f*(omega2-omega1));
-
-          }
+        if (mpi_rank == 0)
+          cerr << "Have not read profiles.dat" << endl;
+        throw(-1);
       }
+
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+        double f;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   f = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) f = 0.0;
+        else    f = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+        double omega1 = boundVal[pos-1][6];
+        double omega2 = boundVal[pos][6];
+        phi_ph[ifa] =  (omega1 + f*(omega2-omega1));
+      }
+    }
   }
 
   void transformMeshHook()
@@ -1028,74 +1093,89 @@ public:
     {
       JoeWithModels::initialHook();
 
+      boundVal = NULL;
+
       // Read inlet variable profile
-      // file has variables y, rho, u, v, press, ...
-      FILE *ifile;
-      if ((ifile=fopen("./profiles.dat", "rt")) == NULL) {
-          cout << "could not open profiles.dat, apply boundary from input file" << endl;
+      if (checkParam("READ_PROFILE"))
+      {
+        FILE *ifile;
+        if ((ifile=fopen("./profiles.dat", "rt")) == NULL) {
+          cout << "could not open the file profiles.dat" << endl;
           throw(-1);
+        }
+
+        fscanf(ifile, "n=%d\td=%d", &nn, &nval);
+        boundVal = new double *[nn];
+        for (int i = 0; i < nn; i++)
+          boundVal[i] = new double [nval];
+
+        // file has variables y, rho, u, v, press, ...
+        for (int i=0; i<nn; i++)
+          for (int v=0; v<nval; v++)
+            fscanf(ifile, "%lf", &boundVal[i][v]);
+
+        fclose(ifile);
+        if (mpi_rank == 0)
+          cout << "FINISHED READING INLET PROFILE" << endl;
       }
 
-      fscanf(ifile, "n=%d\td=%d", &nn, &nval);
-      boundVal = new double *[nn];
-      for (int i = 0; i < nn; i++)
-        boundVal[i] = new double [nval];
-
-      for (int i=0; i<nn; i++)
-        for (int v=0; v<nval; v++)
-          fscanf(ifile, "%lf", &boundVal[i][v]);
-
-      fclose(ifile);
-
       // Specify initial condition over whole flow
-      if (checkParam("SET_INIT_PROFILE")){
-      if(!checkDataFlag(rho))
+      if (checkParam("SET_INIT_PROFILE"))
+      {
+        if(!checkDataFlag(rho))
         {
+          if (boundVal == NULL)
+          {
+            if (mpi_rank == 0)
+              cerr << "Have not read profiles.dat" << endl;
+            throw(-1);
+          }
+
           for (int icv=0; icv<ncv; icv++)
-            {
-              int pos=1;
-              // while pos and pos-1 dont sandwich x_cv, keep increasing pos
-              while(boundVal[pos][0] < x_cv[icv][1] && (pos<nn-1))       pos++;
+          {
+            int pos=1;
+            // while pos and pos-1 dont sandwich x_cv, keep increasing pos
+            while(boundVal[pos][0] < x_cv[icv][1] && (pos<nn-1))       pos++;
 
-              double fi;
-              // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
-              if      (x_cv[icv][1] > boundVal[pos][0])    fi = 1.0;
-              // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
-              else if (x_cv[icv][1] < boundVal[pos-1][0])  fi = 0.0;
-              else    fi = (x_cv[icv][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+            double fi;
+            // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
+            if      (x_cv[icv][1] > boundVal[pos][0])    fi = 1.0;
+            // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
+            else if (x_cv[icv][1] < boundVal[pos-1][0])  fi = 0.0;
+            else    fi = (x_cv[icv][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
 
-              double rho1 = boundVal[pos-1][1];
-              double rho2 = boundVal[pos][1];
-              rho[icv] = rho1+fi*(rho2-rho1);
+            double rho1 = boundVal[pos-1][1];
+            double rho2 = boundVal[pos][1];
+            rho[icv] = rho1+fi*(rho2-rho1);
 
-              double uvel1 = boundVal[pos-1][2];
-              double uvel2 = boundVal[pos][2];
-              rhou[icv][0] = uvel1*rho1+fi*(uvel2*rho2-uvel1*rho1);
-              rhou[icv][1] = rhou[icv][2]=0.0;
+            double uvel1 = boundVal[pos-1][2];
+            double uvel2 = boundVal[pos][2];
+            rhou[icv][0] = uvel1*rho1+fi*(uvel2*rho2-uvel1*rho1);
+            rhou[icv][1] = rhou[icv][2]=0.0;
 
-              double press1 = boundVal[pos-1][4];
-              double press2 = boundVal[pos][4];
-              press[icv] = press1+fi*(press2-press1);
+            double press1 = boundVal[pos-1][4];
+            double press2 = boundVal[pos][4];
+            press[icv] = press1+fi*(press2-press1);
 
-              rhoE[icv] = press[icv]/(gamma[icv]-1.0) + 0.5/rho[icv]*vecDotVec3d(rhou[icv],rhou[icv])
-                        + rho[icv]*kine[icv];
+            rhoE[icv] = press[icv]/(gamma[icv]-1.0) + 0.5/rho[icv]*vecDotVec3d(rhou[icv],rhou[icv])
+                      + rho[icv]*kine[icv];
 
-              double kine1 = boundVal[pos-1][5];
-              double kine2 = boundVal[pos][5];
-              kine[icv] = kine1+fi*(kine2-kine1);
+            double kine1 = boundVal[pos-1][5];
+            double kine2 = boundVal[pos][5];
+            kine[icv] = kine1+fi*(kine2-kine1);
 
-              double eps1 = boundVal[pos-1][6];
-              double eps2 = boundVal[pos][6];
-              eps[icv] = eps1+fi*(eps2-eps1);
+            double eps1 = boundVal[pos-1][6];
+            double eps2 = boundVal[pos][6];
+            eps[icv] = eps1+fi*(eps2-eps1);
 
-              double v21 = boundVal[pos-1][7];
-              double v22 = boundVal[pos][7];
-              v2[icv] = v21 + fi*(v22 - v21);
+            double v21 = boundVal[pos-1][7];
+            double v22 = boundVal[pos][7];
+            v2[icv] = v21 + fi*(v22 - v21);
 
-              double f1 = boundVal[pos-1][8];
-              double f2 = boundVal[pos][8];
-              f[icv] = f1 + fi*(f2 - f1);
-            }
+            double f1 = boundVal[pos-1][8];
+            double f2 = boundVal[pos][8];
+            f[icv] = f1 + fi*(f2 - f1);
+          }
 
           updateCvData(rhou, REPLACE_ROTATE_DATA);
           updateCvData(rho, REPLACE_DATA);
@@ -1111,7 +1191,14 @@ public:
   virtual void boundaryHook(double *T_input, double (*vel_input)[3], double *p_input, FaZone *zone)
   {
     if (zone->getNameString() == getStringParam("INLET_NAME"))
+    {
+      if (boundVal == NULL)
       {
+        if (mpi_rank == 0)
+          cerr << "Have not read profiles.dat" << endl;
+        throw(-1);
+      }
+
         double u_bc[3], T_bc, p_bc, rho_bc, gamma_bc, c_bc, s_bc;
         gamma_bc = 1.4;
         double gm1 = gamma_bc - 1.0;
@@ -1216,6 +1303,12 @@ public:
 
     if ((name == "kine") && (zone->getNameString() == getStringParam("INLET_NAME")))
       {
+      if (boundVal == NULL)
+      {
+        if (mpi_rank == 0)
+          cerr << "Have not read profiles.dat" << endl;
+        throw(-1);
+      }
         for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
           {
             int pos=1;
@@ -1234,6 +1327,12 @@ public:
 
     if ((name == "eps") && (zone->getNameString() == getStringParam("INLET_NAME")))
       {
+      if (boundVal == NULL)
+      {
+        if (mpi_rank == 0)
+          cerr << "Have not read profiles.dat" << endl;
+        throw(-1);
+      }
         for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
           {
             int pos=1;
@@ -1252,6 +1351,12 @@ public:
       }
     if ((name == "v2") && (zone->getNameString() == getStringParam("INLET_NAME")))
       {
+      if (boundVal == NULL)
+      {
+        if (mpi_rank == 0)
+          cerr << "Have not read profiles.dat" << endl;
+        throw(-1);
+      }
         for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
           {
             int pos=1;
@@ -1270,6 +1375,12 @@ public:
       }
     if ((name == "f") && (zone->getNameString() == getStringParam("INLET_NAME")))
       {
+      if (boundVal == NULL)
+      {
+        if (mpi_rank == 0)
+          cerr << "Have not read profiles.dat" << endl;
+        throw(-1);
+      }
         for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
           {
             int pos=1;
@@ -1316,6 +1427,301 @@ public:
   }
 };
 
+/*
+ * Boundary Layer on Flat Plate with KEps
+ */
+class BlayerKEps: public MyJoeASBM{
+protected:
+  int    nn;             // number of nodes in input profile
+  int    nval;           // number of variables in input profile
+  double **boundVal;     // holder for input profile data
+
+public:
+  BlayerKEps(char *name) : MyJoeASBM(name), UgpWithCvCompFlow(name)
+  {
+    if (mpi_rank == 0) cout << "BlayerKEps()" << endl;
+  }
+
+  virtual ~BlayerKEps()  {}
+
+  void initialHook()
+    {
+      JoeWithModels::initialHook();
+
+      boundVal = NULL;
+
+      // Read inlet variable profile
+      if (checkParam("READ_PROFILE"))
+      {
+        FILE *ifile;
+        if ((ifile=fopen("./profiles.dat", "rt")) == NULL) {
+          cout << "could not open the file profiles.dat" << endl;
+          throw(-1);
+        }
+
+        fscanf(ifile, "n=%d\td=%d", &nn, &nval);
+        boundVal = new double *[nn];
+        for (int i = 0; i < nn; i++)
+          boundVal[i] = new double [nval];
+
+        // file has variables y, rho, u, v, press, ...
+        for (int i=0; i<nn; i++)
+          for (int v=0; v<nval; v++)
+            fscanf(ifile, "%lf", &boundVal[i][v]);
+
+        fclose(ifile);
+        if (mpi_rank == 0)
+          cout << "FINISHED READING INLET PROFILE" << endl;
+      }
+
+      // Specify initial condition over whole flow
+      if (checkParam("SET_INIT_PROFILE"))
+      {
+        if(!checkDataFlag(rho))
+        {
+          if (boundVal == NULL)
+          {
+            if (mpi_rank == 0)
+              cerr << "Have not read profiles.dat" << endl;
+            throw(-1);
+          }
+          for (int icv=0; icv<ncv; icv++)
+          {
+            int pos=1;
+            // while pos and pos-1 dont sandwich x_cv, keep increasing pos
+            while(boundVal[pos][0] < x_cv[icv][1] && (pos<nn-1))       pos++;
+
+            double fi;
+            // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
+            if      (x_cv[icv][1] > boundVal[pos][0])    fi = 1.0;
+            // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
+            else if (x_cv[icv][1] < boundVal[pos-1][0])  fi = 0.0;
+            else    fi = (x_cv[icv][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+            double rho1 = boundVal[pos-1][1];
+            double rho2 = boundVal[pos][1];
+            rho[icv] = rho1+fi*(rho2-rho1);
+
+            double uvel1 = boundVal[pos-1][2];
+            double uvel2 = boundVal[pos][2];
+            rhou[icv][0] = uvel1*rho1+fi*(uvel2*rho2-uvel1*rho1);
+            rhou[icv][1] = rhou[icv][2]=0.0;
+
+            double press1 = boundVal[pos-1][4];
+            double press2 = boundVal[pos][4];
+            press[icv] = press1+fi*(press2-press1);
+
+            rhoE[icv] = press[icv]/(gamma[icv]-1.0) + 0.5/rho[icv]*vecDotVec3d(rhou[icv],rhou[icv])
+                      + rho[icv]*kine[icv];
+
+            double kine1 = boundVal[pos-1][5];
+            double kine2 = boundVal[pos][5];
+            kine[icv] = kine1+fi*(kine2-kine1);
+
+            double eps1 = boundVal[pos-1][6];
+            double eps2 = boundVal[pos][6];
+            eps[icv] = eps1+fi*(eps2-eps1);
+          }
+
+          updateCvData(rhou, REPLACE_ROTATE_DATA);
+          updateCvData(rho, REPLACE_DATA);
+          updateCvData(rhoE, REPLACE_DATA);
+          updateCvData(kine, REPLACE_DATA);
+          updateCvData(eps, REPLACE_DATA);
+        }
+      }
+    }
+
+  virtual void boundaryHook(double *T_input, double (*vel_input)[3], double *p_input, FaZone *zone)
+  {
+    if (zone->getNameString() == getStringParam("INLET_NAME"))
+      {
+      if (boundVal == NULL)
+      {
+        if (mpi_rank == 0)
+          cerr << "Have not read profiles.dat" << endl;
+        throw(-1);
+      }
+
+        double u_bc[3], T_bc, p_bc, rho_bc, gamma_bc, c_bc, s_bc;
+        gamma_bc = 1.4;
+        double gm1 = gamma_bc - 1.0;
+        double ovgm1 = 1.0/gm1;
+
+        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+          {
+            int pos=1;
+            while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+            double fi;
+            if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
+            else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
+            else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+            double uvel1 = boundVal[pos-1][2];
+            double uvel2 = boundVal[pos][2];
+            u_bc[0] = uvel1 + fi*(uvel2 - uvel1);
+
+            double vvel1 = boundVal[pos-1][3];
+            double vvel2 = boundVal[pos][3];
+            u_bc[1] = 0.0; //vvel1 + f*(vvel2 - vvel1);
+            u_bc[2] = 0.0;
+
+            double press1 = boundVal[pos-1][4];
+            double press2 = boundVal[pos][4];
+            p_bc = press1 + fi*(press2-press1);
+
+            double temp1 = press1/(boundVal[pos-1][1]*R_gas);
+            double temp2 = press2/(boundVal[pos][1]*R_gas);
+            T_bc = temp1 + fi*(temp2-temp1);
+
+            rho_bc = p_bc/(R_gas*T_bc);
+            c_bc = sqrt(gamma_bc*p_bc/rho_bc);
+            s_bc = pow(rho_bc,gamma_bc)/p_bc;
+
+            int icv0 = cvofa[ifa][0];
+            assert( icv0 >= 0 );
+
+            double nVec[3];
+            double area = normVec3d(nVec, fa_normal[ifa]);
+
+            //Compute normal velocity of freestream
+            double qn_bc = vecDotVec3d(nVec,u_bc);
+
+            //Subtract from normal velocity of mesh
+            double vn_bc = qn_bc;// - normalvel_bfa[ifa];
+
+            //Compute normal velocity of internal cell
+            double qne = vecDotVec3d(nVec,vel[icv0]);
+
+            //Compute speed of sound in internal cell
+            double ce = sqrt(gamma[icv0]*press[icv0]/rho[icv0]);
+
+            double ac1, ac2;
+
+            //Compute the Riemann invariants in the halo cell
+            if (vn_bc > -c_bc)           // Outflow or subsonic inflow.
+              ac1 = qne   + 2.0*ovgm1*ce;
+            else                     // Supersonic inflow.
+              ac1 = qn_bc + 2.0*ovgm1*c_bc;
+
+
+            if(vn_bc > c_bc)             // Supersonic outflow.
+              ac2 = qne   - 2.0*ovgm1*ce;
+            else                     // Inflow or subsonic outflow.
+              ac2 = qn_bc - 2.0*ovgm1*c_bc;
+
+
+            double qnf = 0.5*(ac1 + ac2);
+            double cf  = 0.25*(ac1 - ac2)*gm1;
+
+            double velf[3], sf;
+
+            if (vn_bc > 0)                                                       // Outflow
+              {
+                for (int i=0; i<3; i++)
+                  velf[i] = vel[icv0][i] + (qnf - qne)*nVec[i];
+                sf = pow( rho[icv0], gamma[icv0])/press[icv0];
+              }
+            else                                                                 // Inflow
+              {
+                for (int i=0; i<3; i++)
+                  velf[i] = u_bc[i] + (qnf - qn_bc)*nVec[i];
+                sf = s_bc;
+              }
+            //Compute density, pressure and velocity at boundary face
+            double rho_int = pow( (sf*cf*cf/gamma[icv0]), ovgm1);
+            for (int i=0; i<3; i++)
+              vel_input[ifa][i] = velf[i];
+            p_input[ifa] = rho_int*cf*cf/gamma[icv0];
+            T_input[ifa] = p_input[ifa]/(R_gas*rho_int);
+          }
+      }
+  }
+
+  virtual void boundaryHookScalarRansTurb(double *phi_ph, FaZone *zone, const string &name)
+  {
+    RansTurbV2F_half::boundaryHookScalarRansTurb(phi_ph, zone, name);
+
+    Param *param;
+
+    if ((name == "kine") && (zone->getNameString() == getStringParam("INLET_NAME")))
+      {
+      if (boundVal == NULL)
+      {
+        if (mpi_rank == 0)
+          cerr << "Have not read profiles.dat" << endl;
+        throw(-1);
+      }
+        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+          {
+            int pos=1;
+            while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+            double fi;
+            if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
+            else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
+            else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+            double kine1 = boundVal[pos-1][5];
+            double kine2 = boundVal[pos][5];
+            phi_ph[ifa] = kine1 + fi*(kine2-kine1);
+          }
+      }
+
+    if ((name == "eps") && (zone->getNameString() == getStringParam("INLET_NAME")))
+      {
+      if (boundVal == NULL)
+      {
+        if (mpi_rank == 0)
+          cerr << "Have not read profiles.dat" << endl;
+        throw(-1);
+      }
+        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+          {
+            int pos=1;
+            while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+
+            double fi;
+            if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
+            else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
+            else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+
+            double eps1 = boundVal[pos-1][6];
+            double eps2 = boundVal[pos][6];
+            phi_ph[ifa] =  (eps1 + fi*(eps2-eps1));
+
+          }
+      }
+  }
+
+  void transformMeshHook()
+  {
+    if (!checkParam("TRANSFORM_MESH")) return;
+
+    double scl_mesh = getDoubleParam("SCL_MESH", "1.0");
+    for (int ino = 0; ino < getNno(); ++ino)
+      x_no[ino][0] *= scl_mesh;
+
+    // clearFlag for wall distance to recompute the wallDist when mesh deformed
+    //DoubleScalar *wallD = getScalarData("wallDist");
+    //wallD->clearFlag();
+  }
+
+  virtual void finalHook()
+  {
+    writeAllValues();
+
+    for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+      if (zone->getKind() == FA_ZONE_BOUNDARY)
+        {
+          Param *param;
+          if (getParam(param, zone->getName()))
+            if (param->getString() == "WALL")
+              writeWallValues(zone->getName());
+        }
+  }
+};
 /*
  * Flat channel with inlet and outlet bcs, SST
  */
@@ -1913,8 +2319,9 @@ int main(int argc, char *argv[])
     case 8:   joe = new PerChanKEps(inputFileName);     break;
     case 9:   joe = new BlayerSST(inputFileName);       break;
     case 10:  joe = new BlayerV2F(inputFileName);       break;
-    case 11:  joe = new NonPerChanSST(inputFileName);   break;
-    case 12:  joe = new NonPerChanV2F(inputFileName);   break;
+    case 11:  joe = new BlayerKEps(inputFileName);      break;
+    case 12:  joe = new NonPerChanSST(inputFileName);   break;
+    case 13:  joe = new NonPerChanV2F(inputFileName);   break;
     default: 
       if (mpi_rank == 0)
         cerr << "ERROR: run number not available!" << endl;

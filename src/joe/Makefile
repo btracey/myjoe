@@ -46,7 +46,7 @@ joe: obj joe.o
 	$(CC) -o $@ $(CLD) $(OBJS) $(JOE_LIBS); mv $@ $(MUM_HOME)/bin
 
 # joe.o treated separately because can be changed by user in case directory
-joe.o: joe.cpp $(joe_H)
+joe.o: joe.cpp $(joe_H) 
 	$(CC) $(CFLAGS) -I$(MUM_HOME)/src/common -I$(MUM_HOME)/src/common/mixing_combustion -c $<
 
 # Other objects are both joe files and common files

@@ -32,17 +32,17 @@ public:   // constructors
     ScalarTranspEq *eq;
     eq = registerScalarTransport("kine", CV_DATA);
     eq->relax = getDoubleParam("RELAX_kine", "1.0");
-    eq->phiZero = 1.0e-9;
-    eq->phiZeroRel = 1.0e-2;
-    eq->phiMaxiter = 1000;
+    eq->phiZero = 1.0e-8;
+    eq->phiZeroRel = 1.0e-3;
+    eq->phiMaxiter = 100;
     eq->lowerBound = 1.0e-10;
     eq->upperBound = 1.0e10;
 
     eq = registerScalarTransport("eps", CV_DATA);
     eq->relax = getDoubleParam("RELAX_eps", "1.0");
     eq->phiZero = 1.0e-8;
-    eq->phiZeroRel = 1.0e-2;
-    eq->phiMaxiter = 1000;
+    eq->phiZeroRel = 1.0e-3;
+    eq->phiMaxiter = 100;
     eq->lowerBound = 1.0e-10;
     eq->upperBound = 1.0e10;
 
@@ -131,11 +131,11 @@ public:   // member functions
       {
         double strain = (w1*strMag[icv0] + w0*strMag[icv1])/(w0+w1);
         double s = strain*kine_fa/eps_fa;
-        double cmu = min(C_MU, sqrt(C_MU)/s);
-        mut_fa[ifa] = min(cmu*rho_fa*kine_fa*kine_fa/eps_fa, 10000.0);
+        double cmu = min(C_MU, sqrt(C_MU)/max(s,1.0e-12));
+        mut_fa[ifa] = min(cmu*rho_fa*kine_fa*kine_fa/eps_fa, 1000.0);
       }
       else
-        mut_fa[ifa] = min(C_MU*rho_fa*kine_fa*kine_fa/eps_fa, 10000.0);
+        mut_fa[ifa] = min(C_MU*rho_fa*kine_fa*kine_fa/eps_fa, 1000.0);
     }
 
     // boundary faces
@@ -153,11 +153,11 @@ public:   // member functions
           if (realizable == 1)
           {
             double s = strMag[icv0]*kine[icv0]/eps[icv0];
-            double cmu = min(C_MU, sqrt(C_MU)/s);
-            mut_fa[ifa] = min(cmu*rho[icv0]*kine[icv0]*kine[icv0]/eps[icv0], 100.0);    // zero order extrapolation for others
+            double cmu = min(C_MU, sqrt(C_MU)/max(s,1.0e-12));
+            mut_fa[ifa] = min(cmu*rho[icv0]*kine[icv0]*kine[icv0]/eps[icv0], 1000.0);    // zero order extrapolation for others
           }
           else
-            mut_fa[ifa] = min(C_MU*rho[icv0]*kine[icv0]*kine[icv0]/eps[icv0], 100.0);    // zero order extrapolation for others
+            mut_fa[ifa] = min(C_MU*rho[icv0]*kine[icv0]*kine[icv0]/eps[icv0], 1000.0);    // zero order extrapolation for others
         }
     }
 
@@ -243,12 +243,12 @@ public:   // member functions
       for (int icv=0; icv<ncv; icv++)
       {
         double TS = calcTurbTimeScale(kine[icv], eps[icv], strMag[icv], calcMuLam(icv)/rho[icv], 1);
-        double src = (ceps1*calcTurbProd(icv) - ceps2*rho[icv]*eps[icv])/TS;
+        double src = eps[icv]/kine[icv]*(ceps1*calcTurbProd(icv) - ceps2*rho[icv]*eps[icv]);
         rhs[icv] += src*cv_volume[icv];
 
         if (flagImplicit)
         {
-          double dsrcdphi = ceps2/TS;
+          double dsrcdphi = ceps2*eps[icv]/kine[icv];
           int noc00 = nbocv_i[icv];
           A[noc00] += dsrcdphi*cv_volume[icv];
         }

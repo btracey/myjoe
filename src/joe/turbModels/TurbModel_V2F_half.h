@@ -1,16 +1,16 @@
-#ifndef RANSTURBMODEL_V2F_H
-#define RANSTURBMODEL_V2F_H
+#ifndef RANSTURBMODEL_V2F_half_H
+#define RANSTURBMODEL_V2F_half_H
 
 #include "UgpWithCvCompFlow.h"
 
 
-class RansTurbV2F : virtual public UgpWithCvCompFlow
+class RansTurbV2F_half : virtual public UgpWithCvCompFlow
 {
 public:
-  RansTurbV2F()
+  RansTurbV2F_half()
   {
     if (mpi_rank == 0)
-      cout << "RansTurbV2F()" << endl;
+      cout << "RansTurbV2F_half()" << endl;
     
     turbModel = V2F;
 
@@ -39,54 +39,39 @@ public:
     eq->relax = getDoubleParam("RELAX_eps", "0.7");
     eq->phiZero = 1.0e-8;
     eq->phiMaxiter = 500;
-    eq->lowerBound = 1.0e-11;
+    eq->lowerBound = 1.0e-06; //1.0e-11;
     eq->upperBound = 1.0e10;
     eq->turbSchmidtNumber = SIG_D;
-
-    eq = registerScalarTransport("v2",  CV_DATA);
-    eq->relax = getDoubleParam("RELAX_v2", "0.7");
-    eq->phiZero = 1.0e-9;
-    eq->phiMaxiter = 500;
-    eq->lowerBound = 0.66667e-11;
-    eq->upperBound = 1.0e10;
-    eq->turbSchmidtNumber = SIG_K;
-
-    eq = registerScalarTransport("f",  CV_DATA);
-    eq->convTerm = false;
-    eq->relax = getDoubleParam("RELAX_f", "1.0");
-    eq->phiZero = 1.0e-8;
-    eq->phiMaxiter = 1000;
-    eq->lowerBound = 0.0;
-    eq->upperBound = 1.0e10;
-    eq->turbSchmidtNumber = 1.0;
 
     strMag = NULL;       registerScalar(strMag, "strMag", CV_DATA);
     diverg = NULL;       registerScalar(diverg, "diverg", CV_DATA);
     turbTS = NULL;       registerScalar(turbTS, "turbTS", CV_DATA);
     turbLS = NULL;       registerScalar(turbLS, "turbLS", CV_DATA);
     muT    = NULL;       registerScalar(muT,    "muT",    CV_DATA);
-    fsrc1  = NULL;       registerScalar(fsrc1, "fsrc1", CV_DATA);
-    fsrc2  = NULL;       registerScalar(fsrc2, "fsrc2", CV_DATA);
-    fsrc3  = NULL;       registerScalar(fsrc3, "fsrc3", CV_DATA);
+    v2     = NULL;       registerScalar(v2,     "v2",     CV_DATA);
+
     tturb  = NULL; registerScalar(tturb, "tturb", CV_DATA);
     tkol   = NULL; registerScalar(tkol, "tkol", CV_DATA);
     trel   = NULL; registerScalar(trel, "trel", CV_DATA);
     lturb  = NULL; registerScalar(lturb, "lturb", CV_DATA);
     lkol   = NULL; registerScalar(lkol, "lkol", CV_DATA);
     lrel   = NULL; registerScalar(lrel, "lrel", CV_DATA);
+
+    omega = NULL; registerScalar(omega, "omega", CV_DATA);
   }
 
-  virtual ~RansTurbV2F() {}
+  virtual ~RansTurbV2F_half() {}
 
 public:
 
-  double *eps, *v2, *f;                                 ///< turbulent scalars, introduced to have access to variables, results in to more readable code
-  double *kine_bfa, *eps_bfa, *v2_bfa, *f_bfa;          ///< turbulent scalars at the boundary
-  double *muT;                                          ///< turbulent viscosity at cell center for output
+  double *eps, *v2;                           ///< turbulent scalars, introduced to have access to variables, results in to more readable code
+  double *kine_bfa, *eps_bfa;                 ///< turbulent scalars at the boundary
+  double *muT;                                ///< turbulent viscosity at cell center for output
   
   double C_MU, SIG_K, SIG_D, CEPS1, CEPS2, C1, C2, CETA, CL, ALPHA, ENN;
 
-  double *fsrc1, *fsrc2, *fsrc3, *tturb, *tkol, *trel, *lkol, *lrel, *lturb;
+  double *tturb, *tkol, *trel, *lkol, *lrel, *lturb;
+  double *omega;
 
 public:
 
@@ -98,8 +83,6 @@ public:
     ScalarTranspEq *eq;
     eq = getScalarTransportData("kine");     kine = eq->phi;      kine_bfa = eq->phi_bfa;
     eq = getScalarTransportData("eps");      eps = eq->phi;       eps_bfa = eq->phi_bfa;
-    eq = getScalarTransportData("v2");       v2 = eq->phi;        v2_bfa = eq->phi_bfa;
-    eq = getScalarTransportData("f");        f = eq->phi;         f_bfa = eq->phi_bfa;
     
     // initialize from *.in file
     double turb[2];
@@ -121,20 +104,15 @@ public:
 
     if (!checkScalarFlag("eps"))
       for (int icv = 0; icv < ncv; icv++)
-        eps[icv] = turb[1];
+        eps[icv] = 0.09*kine[icv]*omega[icv];//turb[1];
 
     if (!checkScalarFlag("v2"))
       for (int icv = 0; icv < ncv; icv++)
         v2[icv] = 2.0/3.0*kine[icv];
 
-    if (!checkScalarFlag("f"))
-      for (int icv = 0; icv < ncv; icv++)
-        f[icv] = 0.0;
-
     updateCvDataByName("kine", REPLACE_DATA);
     updateCvDataByName("eps", REPLACE_DATA);
     updateCvDataByName("v2", REPLACE_DATA);
-    updateCvDataByName("f", REPLACE_DATA);
   }
 
   virtual void calcRansTurbViscMuet()
@@ -142,9 +120,10 @@ public:
     calcGradVel();
     // update strain rate tensor 
     calcStrainRateAndDivergence();
-    // clipper for v2
-    //for (int icv = 0; icv < ncv; icv++)
-    //  v2[icv] = min(v2[icv],2.0/3.0*kine[icv]);
+
+    // update v2 variable
+    for (int icv = 0; icv < ncv; icv++)
+      v2[icv] = -1.0*rij_diag[icv][1]/rho[icv];
 
     //--------------------------------
     // calculate turbulent viscosity
@@ -224,20 +203,6 @@ public:
       scal = getScalarTransportData(name);
       for (int ifa = 0; ifa < nfa; ifa++)
         scal->diff[ifa] = mul_fa[ifa] + mut_fa[ifa]/scal->turbSchmidtNumber;
-    }
-
-    if (name == "v2")
-    {
-      scal = getScalarTransportData(name);
-      for (int ifa = 0; ifa < nfa; ifa++)
-        scal->diff[ifa] = mul_fa[ifa] + mut_fa[ifa]/scal->turbSchmidtNumber;
-    }
-
-    if (name == "f")
-    {
-      scal = getScalarTransportData(name);
-      for (int ifa = 0; ifa < nfa; ifa++)
-        scal->diff[ifa] = 1.0;
     }
   }
 
@@ -337,60 +302,6 @@ public:
           A[noc00] -= dsrcdphi*cv_volume[icv];
         }
     }
-
-    if (name == "v2")       // rho*(kine*f-N*v2*eps/kine)
-    {
-      for (int icv = 0; icv < ncv; icv++)
-      {
-        /*double nuLamCV = calcMuLam(icv)/rho[icv];
-        double TS  = calcTurbTimeScale(kine[icv], eps[icv], v2[icv], strMag[icv],nuLamCV,0);
-        double prod1 = f[icv]*rho[icv]*kine[icv];
-        double prod2 = -rho[icv]/TS*((C1-ENN)*v2[icv] - (C1-1.0)*(2./3.)*kine[icv]) + C2*getTurbProd(icv, 1);
-
-        double src = min(prod1,prod2) -ENN*eps[icv]/kine[icv]*rho[icv]*v2[icv];*/
-        double src = f[icv]*rho[icv]*kine[icv]-ENN*eps[icv]/kine[icv]*rho[icv]*v2[icv];
-        rhs[icv]  += src*cv_volume[icv];
-
-        // d()/d(rhov2)
-        if (flagImplicit)
-          {
-            int noc00 = nbocv_i[icv];
-            double dsrcdphi = -ENN*eps[icv]/kine[icv];
-            A[noc00] -= dsrcdphi*cv_volume[icv];
-          }
-      }
-    }
-
-    if (name == "f")      //
-      {
-        for (int icv = 0; icv < ncv; icv++)
-          {
-            double nuLamCV = calcMuLam(icv)/rho[icv];
-
-            // no ralizability for TS?!?!?!
-            double TS  = calcTurbTimeScale(kine[icv], eps[icv], v2[icv], strMag[icv],nuLamCV,0);
-
-            // ralizability for LS?!?!?!
-            double LS = calcTurbLengthScale(kine[icv], eps[icv], v2[icv], strMag[icv], nuLamCV,1);
-            double LS2 = LS*LS;
-
-            // realizabilty for production ?!?!?!
-            double src  = f[icv]+1.0/TS*((C1-ENN)*v2[icv]/kine[icv]-(C1-1.0)*(2./3.)) - C2*getTurbProd(icv, 1)/(kine[icv]*rho[icv]);
-            src /= -LS2;
-            rhs[icv] += src*cv_volume[icv];
-
-            fsrc1[icv] = 1.0/TS*((C1-ENN)*v2[icv]/kine[icv]-(C1-1.0)*(2./3.)) - C2*getTurbProd(icv, 1)/(kine[icv]*rho[icv]);
-            fsrc2[icv] = 1.0/TS; //-f[icv]/LS2;
-            fsrc3[icv] = v2[icv]/kine[icv]; //-fsrc1[icv]/LS2;
-
-            if (flagImplicit)
-              {
-                int noc00 = nbocv_i[icv];
-                double dsrcdphi = -1.0/LS2*1/rho[icv];
-                A[noc00] -= dsrcdphi*cv_volume[icv];
-              }
-          }
-      }
   }
 
   virtual void boundaryHookScalarRansTurb(double *phi_fa, FaZone *zone, const string &name)
@@ -411,55 +322,10 @@ public:
         phi_fa[ifa] = epsWall;
       }
     }
-
-    if (name == "f")
-    {
-      switch ((int)ENN)
-      {
-      case 6:
-        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
-          phi_fa[ifa] = 0.0;
-        break;
-
-      case 1:
-        {
-          for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
-          {
-            int icv0 = cvofa[ifa][0];
-
-            double nVec[3], s_half[3];
-            normVec3d(nVec, fa_normal[ifa]);
-            vecMinVec3d(s_half, x_fa[ifa], x_cv[icv0]);
-            double wallDist = fabs(vecDotVec3d(s_half, nVec));
-            double nuLamCV = calcMuLam(icv0)/rho[icv0];
-            double fWall = -(24.0-4.0*ENN)*nuLamCV*nuLamCV*v2[icv0]/(eps[icv0]*pow(wallDist, 4.0));
-
-            phi_fa[ifa] = fWall;
-          }
-        }
-        break;
-      default:
-        cerr << "wrong value for ENN defined" << endl;
-        break;
-      }
-    }
   }
 
   virtual void finalHookScalarRansTurbModel()
-  {
-    if (mpi_rank == 0) cout << "calcRsBoussinesq()" << endl;
-    for (int icv = 0; icv < ncv; icv++)
-    {
-      double term1 = (2.0/3.0) * rho[icv] * kine[icv];
-      // build Reynolds Stress tensor according to compressible formulation written above
-      rij_diag[icv][0] = -term1 + muT[icv] * 2.0 * (grad_u[icv][0][0] - 1.0/3.0*diverg[icv]);
-      rij_diag[icv][1] = -term1 + muT[icv] * 2.0 * (grad_u[icv][1][1] - 1.0/3.0*diverg[icv]);
-      rij_diag[icv][2] = -term1 + muT[icv] * 2.0 * (grad_u[icv][2][2] - 1.0/3.0*diverg[icv]);
-      rij_offdiag[icv][0] =     + muT[icv] * (grad_u[icv][0][1] + grad_u[icv][1][0]);
-      rij_offdiag[icv][1] =     + muT[icv] * (grad_u[icv][0][2] + grad_u[icv][2][0]);
-      rij_offdiag[icv][2] =     + muT[icv] * (grad_u[icv][1][2] + grad_u[icv][2][1]);
-    }
-  }
+  {}
 };
 
 

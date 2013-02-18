@@ -34,6 +34,9 @@ TurbModel_SA_H = $(MUM_HOME)/src/joe/turbModels/TurbModel_SA.h \
 
 TurbModel_V2F_H = $(MUM_HOME)/src/joe/turbModels/TurbModel_V2F.h \
                   $(UgpWithCvCompFlow_H)
+
+TurbModel_V2F_half_H = $(MUM_HOME)/src/joe/turbModels/TurbModel_V2F_half.h \
+                  $(UgpWithCvCompFlow_H)
                   
 TurbModel_ASBM_H = $(MUM_HOME)/src/joe/turbModels/TurbModel_ASBM.h \
                   $(UgpWithCvCompFlow_H)
@@ -87,6 +90,7 @@ joe_H = $(JoeWithModels_H) \
         $(TurbModel_KOMSST_H) \
         $(TurbModel_SA_H) \
         $(TurbModel_V2F_H) \
+        $(TurbModel_V2F_half_H) \
         $(TurbModel_ASBM_H) \
         $(EUQ_Turb_KOM_H) \
         $(EUQ_Turb_SA_H) \

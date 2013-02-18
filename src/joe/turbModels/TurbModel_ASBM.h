@@ -3,10 +3,12 @@
 
 #include "TurbModel_KOMSST.h"
 #include "TurbModel_V2F.h"
+#include "TurbModel_V2F_half.h"
 
 
 //typedef RansTurbKOmSST TURB_MOD_FOR_ASBM; // define the turbulence model used with the ASBM
-typedef RansTurbV2F TURB_MOD_FOR_ASBM;
+//typedef RansTurbV2F TURB_MOD_FOR_ASBM;
+typedef RansTurbV2F_half TURB_MOD_FOR_ASBM;
 
 extern "C"{
   void asbm_(
@@ -190,6 +192,8 @@ public:   // member functions
         if ( step%block_frq == 0 ) calcBlockTensor();
         calcRsCenterASBM();
     }
+
+    TURB_MOD_FOR_ASBM::calcRansTurbViscMuet();
   }
 
   virtual void setNonLinearDomain(){
