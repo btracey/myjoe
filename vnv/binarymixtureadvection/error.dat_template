@@ -1,5 +1,0 @@
-TITLE = "Convergence analysis for advection of a binary mixture"
-VARIABLES = "Nx" "dx"
-"dT_L1" "dP_L1" "dRho_L1" "dU_L1" "dZ_L1"
-"dT_L2" "dP_L2" "dRho_L2" "dU_L2" "dZ_L2"
-"dT_Linf" "dP_Linf" "dRho_Linf" "dU_Linf" "dZ_Linf"

@@ -2,11 +2,15 @@
 
 //*****************************************************************************//
 // There are two types of scalars:                                             //
-//      ScalarTransport, with its associated class infrastructure              //
-//      Auxiliary scalar, just a CV variable                                   //
+//      -ScalarTransport: has its associated class infrastructure              //
+//      -ScalarAuxiliary: just a registered CV variable                        //
 //*****************************************************************************//
 
-void UgpWithCvCompFlow::calcViscousFluxScalar_aux(double *rhs, double *A, double *phi_bfa, double (*grad_phi)[3])
+//-----------------------------------------------------------------------------//
+// ScalarAuxiliary related functions                                           //
+//-----------------------------------------------------------------------------//
+
+void UgpWithCvCompFlow::calcViscousFluxScalarAux(double *rhs, double *A, double *phi_bfa, double (*grad_phi)[3])
 {
   // ..........................................................................................
   // cycle trough internal faces first
@@ -105,6 +109,10 @@ void UgpWithCvCompFlow::calcViscousFluxScalar_aux(double *rhs, double *A, double
   }
 
 }
+
+//-----------------------------------------------------------------------------//
+// ScalarTransport related functions                                           //
+//-----------------------------------------------------------------------------//
 
 void UgpWithCvCompFlow::calcViscousFluxScalar_new(double *rhs_rhoScal, double *AScal, ScalarTranspEq &transpScal, int flagImplicit)
 {
@@ -253,50 +261,6 @@ void UgpWithCvCompFlow::calcViscousFluxScalar_new(double *rhs_rhoScal, double *A
 
 }
 
-void UgpWithCvCompFlow::solveScalars(double *massFlux)
-{
-  double *rhs = new double[ncv];
-  double *A = new double[nbocv_s];
-
-  // solve the scalars
-
-  for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
-    solveScalarTransport(&(*data), rhs, A, massFlux);
-
-  delete []rhs;
-  delete []A;
-}
-
-void UgpWithCvCompFlow::solveScalarsImplUnsteady(double *massFlux)
-{
-  double *rhs = new double[ncv];
-  double *A = new double[nbocv_s];
-
-  // solve the scalars
-
-  for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
-    solveScalarTransportImplUnsteady(&(*data), rhs, A, massFlux);
-
-  delete []rhs;
-  delete []A;
-}
-
-
-
-void UgpWithCvCompFlow::solveScalarsExplicit(double *massFlux)
-{
-  double *rhs = new double[ncv];
-
-  // solve the scalars
-
-  for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
-    solveScalarTransportExplicit(&(*data), rhs, massFlux);
-
-  delete []rhs;
-}
-
-
-
 void UgpWithCvCompFlow::setScalarBC(FaZone *zone)
 {
 
@@ -355,10 +319,46 @@ void UgpWithCvCompFlow::setScalarBC(FaZone *zone)
   }
 }
 
+void UgpWithCvCompFlow::solveScalars(double *massFlux)
+{
+  double *rhs = new double[ncv];
+  double *A = new double[nbocv_s];
 
-/**
- *  solveScalarTransport: steady (no time term) implicit
- */
+  // solve the scalars
+
+  for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
+    solveScalarTransport(&(*data), rhs, A, massFlux);
+
+  delete []rhs;
+  delete []A;
+}
+
+void UgpWithCvCompFlow::solveScalarsImplUnsteady(double *massFlux)
+{
+  double *rhs = new double[ncv];
+  double *A = new double[nbocv_s];
+
+  // solve the scalars
+
+  for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
+    solveScalarTransportImplUnsteady(&(*data), rhs, A, massFlux);
+
+  delete []rhs;
+  delete []A;
+}
+
+void UgpWithCvCompFlow::solveScalarsExplicit(double *massFlux)
+{
+  double *rhs = new double[ncv];
+
+  // solve the scalars
+
+  for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
+    solveScalarTransportExplicit(&(*data), rhs, massFlux);
+
+  delete []rhs;
+}
+
 void UgpWithCvCompFlow::solveScalarTransport(ScalarTranspEq *scal, double *rhs, double *A, double *massFlux_fa)
 {
   // initialize LHS and RHS and everything else
@@ -624,10 +624,6 @@ void UgpWithCvCompFlow::solveScalarTransport(ScalarTranspEq *scal, double *rhs, 
 
 }
 
-
-/**
- *  solveScalarTransport: steady (no time term) implicit
- */
 void UgpWithCvCompFlow::solveScalarTransportImplUnsteady(ScalarTranspEq *scal, double *rhs, double *A, double *massFlux_fa)
 {
   // initialize LHS and RHS and everything else
@@ -901,12 +897,6 @@ void UgpWithCvCompFlow::solveScalarTransportImplUnsteady(ScalarTranspEq *scal, d
 
 }
 
-
-
-
-/**
- *  solveScalarTransport:
- */
 void UgpWithCvCompFlow::solveScalarTransportExplicit(ScalarTranspEq *scal, double *rhs, double *massFlux_fa)
 {
   // initialize LHS and RHS and everything else

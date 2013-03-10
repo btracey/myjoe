@@ -54,6 +54,7 @@ public:
   double *phi;                            ///< scalar field
   double *phi_bfa;                        ///< scalar boundary values 
   double (*grad_phi)[3];                  ///< scalar gradients
+  double *resid;                          ///< residual field
 
   double *rhophi;                         ///< conserved scalar field (rho * phi)
   double *rhophi_bfa;                     ///< conserved scalar boundary values  (rho * phi)
@@ -79,6 +80,7 @@ public:
     phi      = NULL;
     phi_bfa  = NULL;
     grad_phi = NULL;
+    resid    = NULL;
 
     rhophi      = NULL;
     rhophi_bfa  = NULL;
@@ -500,14 +502,23 @@ public:   // member functions
     //-----------------------------------------------------------------------------------------------------------------
     // therefore, we need to re-connect the doubleScalarListPointer (phi) to the pointer sitting in ScalarList (**ptr)
     for (int i = 0; i < scalarTranspEqVector.size()-1; i++)
+    {
+      char residscal[30] = "resid_";
+      strcat(residscal,scalarTranspEqVector[i].getName());
       for (list<DoubleScalar>::iterator data = doubleScalarList.begin(); data != doubleScalarList.end(); data++)
+      {
         if (strcmp(scalarTranspEqVector[i].getName(), data->getName()) == 0)
           data->ptr = &scalarTranspEqVector[i].phi; //data->connectPointers(scalarTranspEqVector[i].phi);
+        if (strcmp(residscal, data->getName()) == 0)
+          data->ptr = &scalarTranspEqVector[i].resid;
+      }
+    }
 
-
+    char residscal[30] = "resid_";
     ScalarTranspEq *transScal = &(scalarTranspEqVector.back());
 
     registerScalar(transScal->phi, name, datatype);
+    registerScalar(transScal->resid, strcat(residscal,name), datatype);
 
     return transScal;
   }

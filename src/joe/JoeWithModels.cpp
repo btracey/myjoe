@@ -759,6 +759,8 @@ void JoeWithModels::runBackwardEuler()
     for (int iScal = 0; iScal < nScal; iScal++)                               // prepare rhs and A
     {
       string scalname = scalarTranspEqVector[iScal].getName();
+      double *scalresid = scalarTranspEqVector[iScal].resid;
+
       for (int icv = 0; icv < ncv; ++icv)
       {
         rhsScal[iScal][icv] *= underRelaxScalars ;
@@ -778,15 +780,18 @@ void JoeWithModels::runBackwardEuler()
                               - AScal[iScal][2][noc] * dq[nbocv_v[noc]][2]
                               - AScal[iScal][3][noc] * dq[nbocv_v[noc]][3]
                               - AScal[iScal][4][noc] * dq[nbocv_v[noc]][4];
+
+        scalresid[icv] = rhsScal[iScal][icv];
       }
       
-      switch (iScal)
+
+      /*switch (iScal)
       {
       case 0: for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhsScal[iScal][icv]; break;
       case 1: for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhsScal[iScal][icv]; break;
       case 2: for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhsScal[iScal][icv]; break;
       case 3: for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhsScal[iScal][icv]; break;
-      }
+      }*/
 
       solveLinSysScalar(dScal[iScal], AScal[iScal][5], rhsScal[iScal],
                         scalarTranspEqVector[iScal].phiZero,
@@ -859,7 +864,9 @@ void JoeWithModels::runBackwardEuler()
 
     temporalHook();
     dumpProbes(step, 0.0);
-    writeData(step);
+    //if (step >= 62)
+      writeData(step);
+
 
     if ((write_restart > 0) && (step % write_restart == 0))
       writeRestart(step);

@@ -1295,7 +1295,7 @@ public:   // member functions
   
   void calcViscousFluxScalar_new(double *rhs_rhoScal, double *Ascal, ScalarTranspEq &transpScal, int flagImplicit);
 
-  void calcViscousFluxScalar_aux(double *rhs, double *A, double *phi_bfa, double (*grad_phi)[3]);
+  void calcViscousFluxScalarAux(double *rhs, double *A, double *phi_bfa, double (*grad_phi)[3]);
 
   
   

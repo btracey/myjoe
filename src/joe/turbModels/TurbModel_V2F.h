@@ -305,38 +305,38 @@ public:
 
   virtual void sourceHookScalarRansTurb_new(double *rhs, double *A, const string &name, int flagImplicit)
   {
-    if (name == "kine")     // nu_t*str*str - k/k*eps
-    for (int icv = 0; icv < ncv; icv++)
-    {
-      double src  = getTurbProd(icv, 1)-rho[icv]*eps[icv];
-      rhs[icv]   += src*cv_volume[icv];
+    if (name == "kine")
+      for (int icv = 0; icv < ncv; icv++)
+      {
+        double src  = getTurbProd(icv, 1)-rho[icv]*eps[icv];
+        rhs[icv] += src*cv_volume[icv];
 
-      // rho*eps/(rho*kine)
-      if (flagImplicit)
+        //d(rho*kine*eps/kine)/d(rho*kine)
+        if (flagImplicit)
         {
-          int noc00 = nbocv_i[icv];
           double dsrcdphi = -eps[icv]/kine[icv];
-          A[noc00] -= dsrcdphi*cv_volume[icv];
-        }
-    }
-
-    if (name == "eps")      // (ce1*getTurbProd-ce2*rho*eps)/TS
-    for (int icv = 0; icv < ncv; icv++)
-    {
-      double TS  = calcTurbTimeScale(kine[icv], eps[icv], v2[icv], strMag[icv], calcMuLam(icv)/rho[icv], 1);
-      double ce1 = CEPS1*(1.0 + 0.045*pow(kine[icv]/v2[icv], 0.5));
-
-      double src = (ce1*getTurbProd(icv, 1) - rho[icv]*CEPS2*eps[icv])/TS;
-      rhs[icv]  += src*cv_volume[icv];
-
-      // d(ce2*rho*eps/TS)/d(rho*eps)
-      if (flagImplicit)
-        {
           int noc00 = nbocv_i[icv];
-          double dsrcdphi = -CEPS2/TS;
           A[noc00] -= dsrcdphi*cv_volume[icv];
         }
-    }
+      }
+
+    if (name == "eps")
+      for (int icv = 0; icv < ncv; icv++)
+      {
+        double TS  = calcTurbTimeScale(kine[icv], eps[icv], v2[icv], strMag[icv], calcMuLam(icv)/rho[icv], 1);
+        double ce1 = CEPS1*(1.0 + 0.045*pow(kine[icv]/v2[icv], 0.5));
+
+        double src = (ce1*getTurbProd(icv, 1) - CEPS2*rho[icv]*eps[icv])/TS;
+        rhs[icv]  += src*cv_volume[icv];
+
+        // d(ce2*rho*eps/TS)/d(rho*eps)
+        if (flagImplicit)
+        {
+          double dsrcdphi = -CEPS2/TS;
+          int noc00 = nbocv_i[icv];
+          A[noc00] -= dsrcdphi*cv_volume[icv];
+        }
+      }
 
     if (name == "v2")       // rho*(kine*f-N*v2*eps/kine)
     {
@@ -353,11 +353,11 @@ public:
 
         // d()/d(rhov2)
         if (flagImplicit)
-          {
-            int noc00 = nbocv_i[icv];
-            double dsrcdphi = -ENN*eps[icv]/kine[icv];
-            A[noc00] -= dsrcdphi*cv_volume[icv];
-          }
+        {
+          double dsrcdphi = -ENN*eps[icv]/kine[icv];
+          int noc00 = nbocv_i[icv];
+          A[noc00] -= dsrcdphi*cv_volume[icv];
+        }
       }
     }
 
@@ -385,8 +385,8 @@ public:
 
             if (flagImplicit)
               {
+              double dsrcdphi = -1.0/LS2*1/rho[icv];
                 int noc00 = nbocv_i[icv];
-                double dsrcdphi = -1.0/LS2*1/rho[icv];
                 A[noc00] -= dsrcdphi*cv_volume[icv];
               }
           }

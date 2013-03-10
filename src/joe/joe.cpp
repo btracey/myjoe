@@ -650,14 +650,14 @@ public:
 /*
  * Flat channel with periodic bc's, KEps
  */
-class PerChanKEps: public MyJoeASBM{
+class PerChanKEps: public MyJoeKEps{
 protected:
   int    nn;             // number of nodes in input profile
   int    nval;           // number of variables in input profile
   double **boundVal;     // holder for input profile data
 
 public:
-  PerChanKEps(char *name) : MyJoeASBM(name), UgpWithCvCompFlow(name)
+  PerChanKEps(char *name) : MyJoeKEps(name), UgpWithCvCompFlow(name)
   {
     if (mpi_rank == 0) cout << "PerChanKEps()" << endl;
     boundVal = NULL;
@@ -1090,103 +1090,103 @@ public:
   virtual ~BlayerV2F()  {}
 
   void initialHook()
+  {
+    JoeWithModels::initialHook();
+
+    boundVal = NULL;
+
+    // Read inlet variable profile
+    if (checkParam("READ_PROFILE"))
     {
-      JoeWithModels::initialHook();
+      FILE *ifile;
+      if ((ifile=fopen("./profiles.dat", "rt")) == NULL) {
+        cout << "could not open the file profiles.dat" << endl;
+        throw(-1);
+      }
 
-      boundVal = NULL;
+      fscanf(ifile, "n=%d\td=%d", &nn, &nval);
+      boundVal = new double *[nn];
+      for (int i = 0; i < nn; i++)
+        boundVal[i] = new double [nval];
 
-      // Read inlet variable profile
-      if (checkParam("READ_PROFILE"))
+      // file has variables y, rho, u, v, press, ...
+      for (int i=0; i<nn; i++)
+        for (int v=0; v<nval; v++)
+          fscanf(ifile, "%lf", &boundVal[i][v]);
+
+      fclose(ifile);
+      if (mpi_rank == 0)
+        cout << "FINISHED READING INLET PROFILE" << endl;
+    }
+
+    // Specify initial condition over whole flow
+    if (checkParam("SET_INIT_PROFILE"))
+    {
+      if(!checkDataFlag(rho))
       {
-        FILE *ifile;
-        if ((ifile=fopen("./profiles.dat", "rt")) == NULL) {
-          cout << "could not open the file profiles.dat" << endl;
+        if (boundVal == NULL)
+        {
+          if (mpi_rank == 0)
+            cerr << "Have not read profiles.dat" << endl;
           throw(-1);
         }
 
-        fscanf(ifile, "n=%d\td=%d", &nn, &nval);
-        boundVal = new double *[nn];
-        for (int i = 0; i < nn; i++)
-          boundVal[i] = new double [nval];
-
-        // file has variables y, rho, u, v, press, ...
-        for (int i=0; i<nn; i++)
-          for (int v=0; v<nval; v++)
-            fscanf(ifile, "%lf", &boundVal[i][v]);
-
-        fclose(ifile);
-        if (mpi_rank == 0)
-          cout << "FINISHED READING INLET PROFILE" << endl;
-      }
-
-      // Specify initial condition over whole flow
-      if (checkParam("SET_INIT_PROFILE"))
-      {
-        if(!checkDataFlag(rho))
+        for (int icv=0; icv<ncv; icv++)
         {
-          if (boundVal == NULL)
-          {
-            if (mpi_rank == 0)
-              cerr << "Have not read profiles.dat" << endl;
-            throw(-1);
-          }
+          int pos=1;
+          // while pos and pos-1 dont sandwich x_cv, keep increasing pos
+          while(boundVal[pos][0] < x_cv[icv][1] && (pos<nn-1))       pos++;
 
-          for (int icv=0; icv<ncv; icv++)
-          {
-            int pos=1;
-            // while pos and pos-1 dont sandwich x_cv, keep increasing pos
-            while(boundVal[pos][0] < x_cv[icv][1] && (pos<nn-1))       pos++;
+          double fi;
+          // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
+          if      (x_cv[icv][1] > boundVal[pos][0])    fi = 1.0;
+          // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
+          else if (x_cv[icv][1] < boundVal[pos-1][0])  fi = 0.0;
+          else    fi = (x_cv[icv][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
 
-            double fi;
-            // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
-            if      (x_cv[icv][1] > boundVal[pos][0])    fi = 1.0;
-            // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
-            else if (x_cv[icv][1] < boundVal[pos-1][0])  fi = 0.0;
-            else    fi = (x_cv[icv][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+          double rho1 = boundVal[pos-1][1];
+          double rho2 = boundVal[pos][1];
+          rho[icv] = rho1+fi*(rho2-rho1);
 
-            double rho1 = boundVal[pos-1][1];
-            double rho2 = boundVal[pos][1];
-            rho[icv] = rho1+fi*(rho2-rho1);
+          double uvel1 = boundVal[pos-1][2];
+          double uvel2 = boundVal[pos][2];
+          rhou[icv][0] = uvel1*rho1+fi*(uvel2*rho2-uvel1*rho1);
+          rhou[icv][1] = rhou[icv][2]=0.0;
 
-            double uvel1 = boundVal[pos-1][2];
-            double uvel2 = boundVal[pos][2];
-            rhou[icv][0] = uvel1*rho1+fi*(uvel2*rho2-uvel1*rho1);
-            rhou[icv][1] = rhou[icv][2]=0.0;
+          double press1 = boundVal[pos-1][4];
+          double press2 = boundVal[pos][4];
+          press[icv] = press1+fi*(press2-press1);
 
-            double press1 = boundVal[pos-1][4];
-            double press2 = boundVal[pos][4];
-            press[icv] = press1+fi*(press2-press1);
-
-            rhoE[icv] = press[icv]/(gamma[icv]-1.0) + 0.5/rho[icv]*vecDotVec3d(rhou[icv],rhou[icv])
+          rhoE[icv] = press[icv]/(gamma[icv]-1.0) + 0.5/rho[icv]*vecDotVec3d(rhou[icv],rhou[icv])
                       + rho[icv]*kine[icv];
 
-            double kine1 = boundVal[pos-1][5];
-            double kine2 = boundVal[pos][5];
-            kine[icv] = kine1+fi*(kine2-kine1);
+          double kine1 = boundVal[pos-1][5];
+          double kine2 = boundVal[pos][5];
+          kine[icv] = kine1+fi*(kine2-kine1);
 
-            double eps1 = boundVal[pos-1][6];
-            double eps2 = boundVal[pos][6];
-            eps[icv] = eps1+fi*(eps2-eps1);
+          double eps1 = boundVal[pos-1][6];
+          double eps2 = boundVal[pos][6];
+          eps[icv] = eps1+fi*(eps2-eps1);
 
-            double v21 = boundVal[pos-1][7];
-            double v22 = boundVal[pos][7];
-            v2[icv] = v21 + fi*(v22 - v21);
+          double v21 = boundVal[pos-1][7];
+          double v22 = boundVal[pos][7];
+          v2[icv] = v21 + fi*(v22 - v21);
 
-            double f1 = boundVal[pos-1][8];
-            double f2 = boundVal[pos][8];
-            f[icv] = f1 + fi*(f2 - f1);
-          }
-
-          updateCvData(rhou, REPLACE_ROTATE_DATA);
-          updateCvData(rho, REPLACE_DATA);
-          updateCvData(rhoE, REPLACE_DATA);
-          updateCvData(kine, REPLACE_DATA);
-          updateCvData(eps, REPLACE_DATA);
-          updateCvData(v2, REPLACE_DATA);
-          updateCvData(f, REPLACE_DATA);
+          double f1 = boundVal[pos-1][8];
+          double f2 = boundVal[pos][8];
+          f[icv] = f1 + fi*(f2 - f1);
         }
+
+        updateCvData(rhou, REPLACE_ROTATE_DATA);
+        updateCvData(rho, REPLACE_DATA);
+        updateCvData(rhoE, REPLACE_DATA);
+        updateCvData(kine, REPLACE_DATA);
+        updateCvData(eps, REPLACE_DATA);
+        updateCvData(v2, REPLACE_DATA);
+        updateCvData(f, REPLACE_DATA);
       }
     }
+  }
 
   virtual void boundaryHook(double *T_input, double (*vel_input)[3], double *p_input, FaZone *zone)
   {
@@ -1302,101 +1302,98 @@ public:
     Param *param;
 
     if ((name == "kine") && (zone->getNameString() == getStringParam("INLET_NAME")))
-      {
+    {
       if (boundVal == NULL)
       {
         if (mpi_rank == 0)
           cerr << "Have not read profiles.dat" << endl;
         throw(-1);
       }
-        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
-          {
-            int pos=1;
-            while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
 
-            double fi;
-            if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
-            else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
-            else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+        double fi;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
+        else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
 
-            double kine1 = boundVal[pos-1][5];
-            double kine2 = boundVal[pos][5];
-            phi_ph[ifa] = kine1 + fi*(kine2-kine1);
-          }
+        double kine1 = boundVal[pos-1][5];
+        double kine2 = boundVal[pos][5];
+        phi_ph[ifa] = kine1 + fi*(kine2-kine1);
       }
+    }
 
     if ((name == "eps") && (zone->getNameString() == getStringParam("INLET_NAME")))
-      {
+    {
       if (boundVal == NULL)
       {
         if (mpi_rank == 0)
           cerr << "Have not read profiles.dat" << endl;
         throw(-1);
       }
-        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
-          {
-            int pos=1;
-            while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
 
-            double fi;
-            if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
-            else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
-            else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+        double fi;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
+        else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
 
-            double eps1 = boundVal[pos-1][6];
-            double eps2 = boundVal[pos][6];
-            phi_ph[ifa] =  (eps1 + fi*(eps2-eps1));
-
-          }
+        double eps1 = boundVal[pos-1][6];
+        double eps2 = boundVal[pos][6];
+        phi_ph[ifa] =  (eps1 + fi*(eps2-eps1));
       }
+    }
     if ((name == "v2") && (zone->getNameString() == getStringParam("INLET_NAME")))
-      {
+    {
       if (boundVal == NULL)
       {
         if (mpi_rank == 0)
           cerr << "Have not read profiles.dat" << endl;
         throw(-1);
       }
-        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
-          {
-            int pos=1;
-            while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
 
-            double fi;
-            if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
-            else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
-            else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+        double fi;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
+        else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
 
-            double v21 = boundVal[pos-1][7];
-            double v22 = boundVal[pos][7];
-            phi_ph[ifa] =  (v21 + fi*(v22-v21));
-
-          }
+        double v21 = boundVal[pos-1][7];
+        double v22 = boundVal[pos][7];
+        phi_ph[ifa] =  (v21 + fi*(v22-v21));
       }
+    }
     if ((name == "f") && (zone->getNameString() == getStringParam("INLET_NAME")))
-      {
+    {
       if (boundVal == NULL)
       {
         if (mpi_rank == 0)
           cerr << "Have not read profiles.dat" << endl;
         throw(-1);
       }
-        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
-          {
-            int pos=1;
-            while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
+      for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+      {
+        int pos=1;
+        while ((boundVal[pos][0] < x_fa[ifa][1]) && (pos < nn-1))      pos++;
 
-            double fi;
-            if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
-            else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
-            else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
+        double fi;
+        if      (x_fa[ifa][1] > boundVal[pos][0])   fi = 1.0;
+        else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
+        else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
 
-            double f1 = boundVal[pos-1][8];
-            double f2 = boundVal[pos][8];
-            phi_ph[ifa] =  (f1 + fi*(f2-f1));
-
-          }
+        double f1 = boundVal[pos-1][8];
+        double f2 = boundVal[pos][8];
+        phi_ph[ifa] =  (f1 + fi*(f2-f1));
       }
+    }
   }
 
   void transformMeshHook()
@@ -1410,6 +1407,23 @@ public:
     // clearFlag for wall distance to recompute the wallDist when mesh deformed
     //DoubleScalar *wallD = getScalarData("wallDist");
     //wallD->clearFlag();
+  }
+
+  virtual void temporalHook()
+  {
+    if (step%10000 == 0)
+    {
+      writeAllValues();
+
+      for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+        if (zone->getKind() == FA_ZONE_BOUNDARY)
+        {
+          Param *param;
+          if (getParam(param, zone->getName()))
+            if (param->getString() == "WALL")
+              writeWallValues(zone->getName());
+        }
+    }
   }
 
   virtual void finalHook()
@@ -1518,8 +1532,8 @@ public:
             double kine2 = boundVal[pos][5];
             kine[icv] = kine1+fi*(kine2-kine1);
 
-            double eps1 = boundVal[pos-1][6];
-            double eps2 = boundVal[pos][6];
+            double eps1 = 0.09*boundVal[pos-1][5]*boundVal[pos-1][6];
+            double eps2 = 0.09*boundVal[pos][5]*boundVal[pos][6];
             eps[icv] = eps1+fi*(eps2-eps1);
           }
 
@@ -1687,8 +1701,8 @@ public:
             else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
             else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
 
-            double eps1 = boundVal[pos-1][6];
-            double eps2 = boundVal[pos][6];
+            double eps1 = 0.09*boundVal[pos-1][5]*boundVal[pos-1][6];
+            double eps2 = 0.09*boundVal[pos][5]*boundVal[pos][6];
             phi_ph[ifa] =  (eps1 + fi*(eps2-eps1));
 
           }
@@ -1706,6 +1720,23 @@ public:
     // clearFlag for wall distance to recompute the wallDist when mesh deformed
     //DoubleScalar *wallD = getScalarData("wallDist");
     //wallD->clearFlag();
+  }
+
+  virtual void temporalHook()
+  {
+    if (step%10000 == 0)
+    {
+      writeAllValues();
+
+      for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+        if (zone->getKind() == FA_ZONE_BOUNDARY)
+        {
+          Param *param;
+          if (getParam(param, zone->getName()))
+            if (param->getString() == "WALL")
+              writeWallValues(zone->getName());
+        }
+    }
   }
 
   virtual void finalHook()
@@ -1976,6 +2007,109 @@ public:
             writeWallValues(zone->getName());
       }
   }
+
+  void readReynoldsStress()
+  {
+    int    nx;             // number of nodes in streamwise direction
+    int    ny;             // number of nodes in cross-stream direction
+    double ***reStress;     // holder for input profile data
+
+    /*** Read the stresses ***/
+    FILE *ifile;
+    if ((ifile=fopen("./reStress.txt", "rt")) == NULL)
+      {
+        cout << "could not open reStress.txt" << endl;
+        throw(-1);
+      }
+
+    // file values: uu vv ww uv
+    fscanf(ifile, "nx=%d\tny=%d", &nx, &ny);
+    reStress = new double** [nx];
+    for (int i = 0; i < nx; i++){
+      reStress[i] = new double* [ny];
+      for (int j = 0; j < ny; j++)
+        reStress[i][j] = new double [6];
+    }
+
+    for (int i = 0; i<nx; i++)
+      for (int j = 0; j < ny; j++)
+        for (int v=0; v<6; v++)
+          fscanf(ifile, "%lf", &reStress[i][j][v]);
+
+    fclose(ifile);
+
+    // Interpolate
+    double re11, re12, re21, re22;
+    double rey1, rey2;
+
+    for (int icv=0; icv<ncv; icv++)
+    {
+      int posx = 1, posy = 1;
+      double fx, fy;
+
+      // while posx and posx-1 don't sandwich x_cv, keep increasing posx
+      while(reStress[posx][0][0] < x_cv[icv][0] && (posx < nx-1))
+        posx++;
+      // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
+      if (x_cv[icv][0] > reStress[posx][0][0])
+        fx = 1.0;
+      // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
+      else if (x_cv[icv][0] < reStress[posx-1][0][0])
+        fx = 0.0;
+      else
+        fx = (x_cv[icv][0] - reStress[posx-1][0][0])/(reStress[posx][0][0] - reStress[posx-1][0][0]);
+
+      // while posy and posy-1 don't sandwich x_cv, keep increasing posy
+      while(reStress[posx][posy][1] < x_cv[icv][1] && (posy < ny-1))
+        posy++;
+      // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
+      if (x_cv[icv][1] > reStress[posx][posy][1])
+        fy = 1.0;
+      // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
+      else if (x_cv[icv][1] < reStress[posx][posy-1][1])
+        fy = 0.0;
+      else
+        fy = (x_cv[icv][1] - reStress[posx][posy-1][1])/(reStress[posx][posy][1] - reStress[posx][posy-1][1]);
+
+      re11 = reStress[posx-1][posy-1][0];
+      re12 = reStress[posx][posy-1][0];
+      re21 = reStress[posx-1][posy][0];
+      re22 = reStress[posx][posy][0];
+      rey1 = re11 + fx*(re12 - re11);
+      rey2 = re21 + fx*(re22 - re21);
+      rij_diag[icv][0] = rey1 + fy*(rey2 - rey1);
+
+      re11 = reStress[posx-1][posy-1][1];
+      re12 = reStress[posx][posy-1][1];
+      re21 = reStress[posx-1][posy][1];
+      re22 = reStress[posx][posy][1];
+      rey1 = re11 + fx*(re12 - re11);
+      rey2 = re21 + fx*(re22 - re21);
+      rij_diag[icv][1] = rey1 + fy*(rey2 - rey1);
+
+      re11 = reStress[posx-1][posy-1][2];
+      re12 = reStress[posx][posy-1][2];
+      re21 = reStress[posx-1][posy][2];
+      re22 = reStress[posx][posy][2];
+      rey1 = re11 + fx*(re12 - re11);
+      rey2 = re21 + fx*(re22 - re21);
+      rij_diag[icv][2] = rey1 + fy*(rey2 - rey1);
+
+      re11 = reStress[posx-1][posy-1][3];
+      re12 = reStress[posx][posy-1][3];
+      re21 = reStress[posx-1][posy][3];
+      re22 = reStress[posx][posy][3];
+      rey1 = re11 + fx*(re12 - re11);
+      rey2 = re21 + fx*(re22 - re21);
+      rij_offdiag[icv][0] = rey1 + fy*(rey2 - rey1);
+      rij_offdiag[icv][1] = 0.0;
+      rij_offdiag[icv][2] = 0.0;
+    }
+
+    updateCvData(rij_diag, REPLACE_ROTATE_DATA);
+    updateCvData(rij_offdiag, REPLACE_ROTATE_DATA);
+  }
+
 };
 
 /*

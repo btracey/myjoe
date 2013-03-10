@@ -31,7 +31,7 @@ public:
     eq->relax = getDoubleParam("RELAX_kine", "0.7");
     eq->phiZero = 1.0e-9;
     eq->phiMaxiter = 500;
-    eq->lowerBound = 1.0e-11;
+    eq->lowerBound = 1.0e-06;
     eq->upperBound = 1.0e10;
     eq->turbSchmidtNumber = SIG_K;
 
@@ -39,7 +39,7 @@ public:
     eq->relax = getDoubleParam("RELAX_eps", "0.7");
     eq->phiZero = 1.0e-8;
     eq->phiMaxiter = 500;
-    eq->lowerBound = 1.0e-06; //1.0e-11;
+    eq->lowerBound = 1.0e-06;
     eq->upperBound = 1.0e10;
     eq->turbSchmidtNumber = SIG_D;
 
@@ -58,6 +58,7 @@ public:
     lrel   = NULL; registerScalar(lrel, "lrel", CV_DATA);
 
     omega = NULL; registerScalar(omega, "omega", CV_DATA);
+    eps_rhs = NULL; registerScalar(eps_rhs, "eps_rhs", CV_DATA);
   }
 
   virtual ~RansTurbV2F_half() {}
@@ -71,7 +72,7 @@ public:
   double C_MU, SIG_K, SIG_D, CEPS1, CEPS2, C1, C2, CETA, CL, ALPHA, ENN;
 
   double *tturb, *tkol, *trel, *lkol, *lrel, *lturb;
-  double *omega;
+  double *omega, *eps_rhs;
 
 public:
 
@@ -104,7 +105,7 @@ public:
 
     if (!checkScalarFlag("eps"))
       for (int icv = 0; icv < ncv; icv++)
-        eps[icv] = 0.09*kine[icv]*omega[icv];//turb[1];
+        eps[icv] = 0.09*kine[icv]*omega[icv];
 
     if (!checkScalarFlag("v2"))
       for (int icv = 0; icv < ncv; icv++)
@@ -148,6 +149,7 @@ public:
 
       double TS  = calcTurbTimeScale(kine_fa, eps_fa, v2_fa, str_fa, nuLam_fa, 1);
       mut_fa[ifa] = min(C_MU*rho_fa*v2_fa*TS, 10000.0);
+      //mut_fa[ifa] = min(0.09*rho_fa*kine_fa*kine_fa/eps_fa, 10000.0);
     }
 
     for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
@@ -165,6 +167,7 @@ public:
             int icv0 = cvofa[ifa][0];
             double TS = calcTurbTimeScale(kine[icv0], eps[icv0], v2[icv0], strMag[icv0], calcMuLam(icv0)/rho[icv0], 1);
             mut_fa[ifa] = min(C_MU*rho[icv0]*v2[icv0]*TS, 10000.0);
+            //mut_fa[ifa] = min(0.09*rho[icv0]*kine[icv0]*kine[icv0]/eps[icv0], 10000.0);
           }
       }
     }
@@ -177,10 +180,10 @@ public:
 
       tturb[icv] = kine[icv]/eps[icv];
       tkol[icv] = 6.0*sqrt(calcMuLam(icv)/rho[icv]/eps[icv]);
-      trel[icv] = kine[icv]/(sqrt(3.0)*v2[icv]*C_MU*strMag[icv]);
+      trel[icv] = kine[icv]/max(sqrt(3.0)*v2[icv]*C_MU*strMag[icv],1.0e-08);  //log(exp(sqrt(3.0)*v2[icv]*C_MU*strMag[icv]) + exp(1.0e-8));
       lturb[icv] = CL*pow(kine[icv],1.5)/eps[icv];
       lkol[icv] = CL*CETA*pow(calcMuLam(icv)/rho[icv],0.75)/pow(eps[icv],0.25);
-      lrel[icv] = pow(kine[icv],1.5)/(sqrt(3.0)*v2[icv]*C_MU*strMag[icv] + 1.0e-14);
+      lrel[icv] = pow(kine[icv],1.5)/(max(sqrt(3.0)*v2[icv]*C_MU*strMag[icv],1.0e-08));
     }
   }
 
@@ -233,9 +236,11 @@ public:
     //TimeScale = sqrt(TimeScale*TimeScale + 36.0*nu/eps);
 
     if (realizable){
-      double RealScale = kine/(max(sqrt(3.0)*v2*C_MU*str,1.0e-14));
-      if (RealScale > KolScale)
+      double RealScale = kine/(max(sqrt(3.0)*v2*C_MU*str,1.0e-08));
+      //if (RealScale > KolScale)
         TimeScale = min(TimeScale, RealScale);
+      //else
+      //  TimeScale = KolScale;
     }
 
     //TimeScale = max(TimeScale, 6.0*sqrt(nu/eps));
@@ -252,9 +257,11 @@ public:
     //LengthScale = sqrt(LengthScale*LengthScale + CL*CL*CETA*CETA*pow(nu,1.5)/pow(eps,0.5));
 
     if (realizable){
-      double RealScale = pow(kine,1.5)/(max(sqrt(3.0)*v2*C_MU*str,1.0e-14));
-      if (RealScale > KolScale)
+      double RealScale = pow(kine,1.5)/(max(sqrt(3.0)*v2*C_MU*str,1.0e-08));
+      //if (RealScale > KolScale)
         LengthScale = min(LengthScale, RealScale);
+      //else
+      //  LengthScale = KolScale;
     }
 
     //LengthScale = max(LengthScale, CL*CETA*pow(nu,0.75)/pow(eps,0.25));
@@ -265,6 +272,7 @@ public:
   double getTurbProd(int icv, int realizable)
   {
     double mu_t = C_MU*rho[icv]*v2[icv]*calcTurbTimeScale(kine[icv], eps[icv], v2[icv], strMag[icv], calcMuLam(icv)/rho[icv], realizable);
+    //double mu_t = 0.09*rho[icv]*kine[icv]*kine[icv]/eps[icv];
     return mu_t*strMag[icv]*strMag[icv] - 2./3.*rho[icv]*kine[icv]*diverg[icv];
   }
 
@@ -292,7 +300,10 @@ public:
       double ce1 = CEPS1*(1.0 + 0.045*pow(kine[icv]/v2[icv], 0.5));
 
       double src = (ce1*getTurbProd(icv, 1) - rho[icv]*CEPS2*eps[icv])/TS;
+      //double Pe = CEPS1*C_MU*rho[icv]*v2[icv]*strMag[icv]*strMag[icv] - 1./TS*CEPS1*2./3.*rho[icv]*kine[icv]*diverg[icv];
+      //double src = Pe - rho[icv]*CEPS2*eps[icv]/TS;
       rhs[icv]  += src*cv_volume[icv];
+      eps_rhs[icv] = rhs[icv];
 
       // d(ce2*rho*eps/TS)/d(rho*eps)
       if (flagImplicit)

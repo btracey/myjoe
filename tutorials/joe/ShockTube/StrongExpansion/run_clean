@@ -1,9 +1,0 @@
-#!/bin/bash
-
-### Clean the directory to its original state
-rm *.eps *.tex shocktube_*.dat
-rm joe.o joe
-rm Makefile
-
-
-

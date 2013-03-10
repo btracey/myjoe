@@ -49,6 +49,7 @@ public:   // constructors
     hatwt         = NULL;     registerScalar(hatwt,         "hatwt",         CV_DATA);
     hatst         = NULL;     registerScalar(hatst,         "hatst",         CV_DATA);
     ststa         = NULL;     registerScalar(ststa,         "ststa",         CV_DATA);
+    marker        = NULL;     // this is an integer array
 
     // Blocking variables
     block_diag    = NULL;     registerVector(block_diag,    "block_diag",    CV_DATA);
@@ -86,6 +87,7 @@ protected:   // member vars
   double   *hatwt;
   double   *hatst;
   double   *ststa;
+  int      *marker;
 
   // Blocking variables
   double   (*block_diag)[3];      // diagonal blockage tensor
@@ -134,24 +136,27 @@ public:   // member functions
         cerr << "Error: cannot open file asbmInfo.dat" << endl;
         throw(-1);
       }
+      else
+        cout << "Opened file asbmInfo.dat" << endl;
     }
 
-    // Initialize bphi, bphi_bfa, grad_bphi, and B tensor
+    // Initialize cell centered data
+    marker = new int[ncv];
     for (int icv = 0; icv < ncv; ++icv)
     {
-        bphi[icv] = 0.0;
+      marker[icv] = 0;
 
-        block_diag[icv][0] = 0.0;
-        block_diag[icv][1] = 0.0;
-        block_diag[icv][2] = 0.0;
+      as_diag[icv][0] = 1.0/3.0;
+      as_diag[icv][1] = 1.0/3.0;
+      as_diag[icv][2] = 1.0/3.0;
 
-        block_offdiag[icv][0] = 0.0;
-        block_offdiag[icv][1] = 0.0;
-        block_offdiag[icv][2] = 0.0;
+      ar_diag[icv][0] = 1.0/3.0;
+      ar_diag[icv][1] = 1.0/3.0;
+      ar_diag[icv][2] = 1.0/3.0;
     }
 
+    // Initialize face centered data
     bphi_bfa  = new double[nfa_b];
-    grad_bphi = new double[ncv_g][3];
     for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
     {
       if (zone->getKind() == FA_ZONE_BOUNDARY)
@@ -177,6 +182,9 @@ public:   // member functions
         }
       }
     }
+
+    // Initialize blocking gradients
+    grad_bphi = new double[ncv_g][3];
     calcCvScalarGrad(grad_bphi, bphi, bphi_bfa, gradreconstruction, limiterNavierS, bphi, epsilonSDWLS);
   }
 
@@ -251,7 +259,7 @@ public:   // member functions
         wt_offdiag[icv][2] = 0.5*(grad_u[icv][1][2] - grad_u[icv][2][1])*tau;
     }
 
-    for (int i = 0; i < 0; i++)
+    for (int i = 0; i < 1; i++)
     {
       updateCvData(st_diag, REPLACE_ROTATE_DATA);
       updateCvData(st_offdiag, REPLACE_ROTATE_DATA);
@@ -307,6 +315,11 @@ public:   // member functions
                << " Cell-z: " << x_cv[icv][2] << endl;
         }
 
+        if (eps[icv] != eps[icv])
+        {
+          marker[icv] = 1;
+        }
+
         rij_diag[icv][0] = -REY[0][0]*2*kine[icv]*rho[icv];
         rij_diag[icv][1] = -REY[1][1]*2*kine[icv]*rho[icv];
         rij_diag[icv][2] = -REY[2][2]*2*kine[icv]*rho[icv];
@@ -336,6 +349,27 @@ public:   // member functions
         ststa[icv] = CIR[2][2];
     }
 
+    MPI_Barrier(mpi_comm);
+    if (mpi_rank != 0)
+    {
+      int dummy;
+      MPI_Status status;
+      MPI_Recv(&dummy,1,MPI_INT,mpi_rank-1,1234,mpi_comm,&status);
+    }
+
+    for (int icv = 0; icv < ncv; icv++)
+      if (marker[icv] == 1){
+        writeDiagnostics(icv);
+        marker[icv] = 0;
+      }
+
+    if ( mpi_rank < mpi_size-1 )
+    {
+      int dummy = 1;
+      MPI_Send(&dummy,1,MPI_INT,mpi_rank+1,1234,mpi_comm);
+    }
+    MPI_Barrier(mpi_comm);
+
     updateCvData(as_diag, REPLACE_ROTATE_DATA);
     updateCvData(as_offdiag, REPLACE_ROTATE_DATA);
     updateCvData(ar_diag, REPLACE_ROTATE_DATA);
@@ -344,7 +378,7 @@ public:   // member functions
     updateCvData(rij_offdiag, REPLACE_ROTATE_DATA);
 
     // Smooth Outputs
-    for (int i = 0; i < 0; i++)
+    for (int i = 0; i < 10; i++)
     {
       smoothingVec(as_diag);
       smoothingVec(as_offdiag);
@@ -352,6 +386,7 @@ public:   // member functions
       smoothingVec(ar_offdiag);
       smoothingVec(rij_diag);
       smoothingVec(rij_offdiag);
+      //smoothingScal(eps);
 
       updateCvData(as_diag, REPLACE_ROTATE_DATA);
       updateCvData(as_offdiag, REPLACE_ROTATE_DATA);
@@ -359,6 +394,7 @@ public:   // member functions
       updateCvData(ar_offdiag, REPLACE_ROTATE_DATA);
       updateCvData(rij_diag, REPLACE_ROTATE_DATA);
       updateCvData(rij_offdiag, REPLACE_ROTATE_DATA);
+      //updateCvData(eps, REPLACE_DATA);
     }
 
     // ====================================================================
@@ -492,7 +528,7 @@ public:   // member functions
     // ..........................................................................................
     // compute the viscous terms
     // ..........................................................................................
-    calcViscousFluxScalar_aux(rhs_block, A_block, bphi_bfa, grad_bphi);
+    calcViscousFluxScalarAux(rhs_block, A_block, bphi_bfa, grad_bphi);
 
     // ..........................................................................................
     // compute the source terms
@@ -552,12 +588,8 @@ public:   // member functions
 
     // clipping
     for (int icv = 0; icv < ncv; ++icv)
-    {
-      if (bphi_temp[icv] > 0)
-        bphi[icv] = bphi_temp[icv];
-      else
-        bphi[icv] = 0.0;
-    }
+      bphi[icv] = min(max(bphi_temp[icv],0.0),1.0);
+
     updateCvData(bphi, REPLACE_DATA);
 
     // compute residual
@@ -634,7 +666,8 @@ public:   // member functions
     // compute the blockage tensor
     // =========================================================================================
     double div_bphi;
-    for (int icv = 0; icv < ncv; icv++){
+    for (int icv = 0; icv < ncv; icv++)
+    {
       div_bphi = 0.0;
       div_bphi += grad_bphi[icv][0]*grad_bphi[icv][0] +
                   grad_bphi[icv][1]*grad_bphi[icv][1] +
@@ -722,9 +755,75 @@ public:   // member functions
     }
   }
 
+  void writeDiagnostics(int icv)
+  {
+    cout << "Writing Diagnostics"<<endl;
+    cout << "step: " << step << endl;
+    cout << "icv: " << icv << endl;
+
+    cout << "st_diag: " << st_diag[icv][0] << endl;
+    cout << "st_diag: " << st_diag[icv][1] << endl;
+    cout << "st_diag: " << st_diag[icv][2] << endl;
+    cout << "st_offdiag: " << st_offdiag[icv][0] << endl;
+    cout << "st_offdiag: " << st_offdiag[icv][1] << endl;
+    cout << "st_offdiag: " << st_offdiag[icv][2] << endl;
+
+    cout << "wt_offdiag: " << wt_offdiag[icv][0] << endl;
+    cout << "wt_offdiag: " << wt_offdiag[icv][1] << endl;
+    cout << "wt_offdiag: " << wt_offdiag[icv][2] << endl;
+
+    cout << "as_diag: " << as_diag[icv][0] << endl;
+    cout << "as_diag: " << as_diag[icv][1] << endl;
+    cout << "as_diag: " << as_diag[icv][2] << endl;
+    cout << "as_offdiag: " << as_offdiag[icv][0] << endl;
+    cout << "as_offdiag: " << as_offdiag[icv][1] << endl;
+    cout << "as_offdiag: " << as_offdiag[icv][2] << endl;
+
+    cout << "ar_diag: " << ar_diag[icv][0] << endl;
+    cout << "ar_diag: " << ar_diag[icv][1] << endl;
+    cout << "ar_diag: " << ar_diag[icv][2] << endl;
+    cout << "ar_offdiag: " << ar_offdiag[icv][0] << endl;
+    cout << "ar_offdiag: " << ar_offdiag[icv][1] << endl;
+    cout << "ar_offdiag: " << ar_offdiag[icv][2] << endl;
+
+    cout << "block_diag: " << block_diag[icv][0] << endl;
+    cout << "block_diag: " << block_diag[icv][1] << endl;
+    cout << "block_diag: " << block_diag[icv][2] << endl;
+    cout << "block_offdiag: " << block_offdiag[icv][0] << endl;
+    cout << "block_offdiag: " << block_offdiag[icv][1] << endl;
+    cout << "block_offdiag: " << block_offdiag[icv][2] << endl;
+
+    cout << "bphi: " << bphi[icv] << endl;
+
+    cout << "scal_phi: " << scal_phi[icv] << endl;
+    cout << "scal_bet: " << scal_bet[icv] << endl;
+    cout << "scal_chi: " << scal_chi[icv] << endl;
+
+    cout << "etar: " << etar[icv] << endl;
+    cout << "etaf: " << etaf[icv] << endl;
+    cout << "a2: " << a2[icv] << endl;
+
+    cout << "rij_diag: " << rij_diag[icv][0] << endl;
+    cout << "rij_diag: " << rij_diag[icv][1] << endl;
+    cout << "rij_diag: " << rij_diag[icv][2] << endl;
+    cout << "rij_offdiag: " << rij_offdiag[icv][0] << endl;
+    cout << "rij_offdiag: " << rij_offdiag[icv][1] << endl;
+    cout << "rij_offdiag: " << rij_offdiag[icv][2] << endl;
+
+    cout << "turbTS: " << turbTS[icv] << endl;
+    cout << "tturb: " << tturb[icv] << endl;
+    cout << "tkol: " << tkol[icv] << endl;
+    cout << "trel: " << trel[icv] << endl;
+    cout << "kine: " << kine[icv] << endl;
+    cout << "eps:  " << eps[icv] << endl;
+    cout << "v2  : " << v2[icv] << endl;
+    cout << "str : " << strMag[icv] << endl << endl;
+  }
+
   virtual void finalHookScalarRansTurbModel()
   {
-    if (bphi_bfa != NULL)  {delete [] bphi_bfa;     bphi_bfa = NULL;}
+    if (marker    != NULL) {delete [] marker;       marker    = NULL;}
+    if (bphi_bfa  != NULL) {delete [] bphi_bfa;     bphi_bfa  = NULL;}
     if (grad_bphi != NULL) {delete [] grad_bphi;    grad_bphi = NULL;}
     if (mpi_rank == 0) fclose(finfo);
   }

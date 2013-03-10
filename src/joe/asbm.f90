@@ -136,6 +136,7 @@
     real(dp)                 :: phi1          !jettal scalar for shear
     real(dp)                 :: bet1          !correlation scalar for shear
     real(dp)                 :: chi1          !flattening scalar for shear
+    real(dp)                 :: chi2
 
     real(dp)                 :: scl_g         !helical scalar
     real(dp), dimension(3)   :: vec_g         !helical vector
@@ -342,7 +343,7 @@
       ! loop point for Newton-Rhapson (N-R) iteration
       converged = .false.
       ktr = 0
-
+      
       NewtonRhapson_ar: do while (.not.converged)
         ktr = ktr + 1
         ! perturbations
@@ -590,12 +591,34 @@
     if (trace_aa > one) then
       write(*,*) 'trace_aa = ', trace_aa, ' greater than one'
       trace_aa = one
+      !a(1,1) = one/sqrt(3.0_dp)
+      !a(2,1) = zero
+      !a(3,1) = zero
+
+      !a(1,2) = zero
+      !a(2,2) = one/sqrt(3.0_dp)
+      !a(3,2) = zero
+    
+      !a(1,3) = zero
+      !a(2,3) = zero
+      !a(3,3) = one/sqrt(3.0_dp)
       ierr = 6
     end if
     
     if (trace_aa < third) then
       write(*,*) 'trace_aa = ', trace_aa, ' less than third'
       trace_aa = third
+      !a(1,1) = third
+      !a(2,1) = zero
+      !a(3,1) = zero
+
+      !a(1,2) = zero
+      !a(2,2) = third
+      !a(3,2) = zero
+    
+      !a(1,3) = zero
+      !a(2,3) = zero
+      !a(3,3) = third
       ierr = 6
     end if
 
@@ -643,8 +666,8 @@
     !eta_c1 = hat_wt/hat_st
     eta_c2 = hat_wtt/hat_st
     
-    if (eta_c1 < zero) eta_c1 = zero
-    if (eta_c2 < zero) eta_c2 = zero
+    if ((eta_c1 < zero) .or. (eta_c1 /= eta_c1)) eta_c1 = zero
+    if ((eta_c2 < zero) .or. (eta_c2 /= eta_c2)) eta_c2 = zero
 
     eta_r = sqrt(eta_c1)
     eta_f = eta_r - sign(sqrt(eta_c2),hat_x)
@@ -672,6 +695,7 @@
       else 
         call int_er_gt_one(eta_r,eta_f,oma,sqamth,phis,bets,chis,phi1,bet1,chi1)
       end if
+      chi2 = chis
       struc_weight = exp(-100.0_dp*abs(eta_r - one)**2.0_dp)
       !phis = phis*(one - struc_weight) + phi1*(struc_weight)
       bets = bets*(one - struc_weight) + bet1*(struc_weight)
@@ -729,7 +753,7 @@
     ! Output some useful data
     cir(1,1) = phi
     cir(1,2) = bet
-    cir(1,3) = chi
+    cir(1,3) = chi1
 
     cir(2,1) = eta_r
     cir(2,2) = eta_f
@@ -1053,8 +1077,9 @@
       chi1 = fifth*bet1
     else if (eta_f < one) then
       phi1 = one - eta_f
-      chi1 = fifth + (one - fifth)*                                             &
-                     (one - (one - eta_f)**2/(one + 3.0_dp*eta_f/oma))
+      chi1 = 0
+    !fifth + (one - fifth)*                                             &
+    !               (one - (one - eta_f)**2/(one + 3.0_dp*eta_f/oma))
       bet1 = one
     else
       phi1 = (eta_f - one)/(3.0_dp*eta_f - one)
@@ -1159,7 +1184,7 @@
     ! check for bad data
     if (trace_bl > one) then
       ierr = 7
-      return
+      return 
     end if
 
     ah = a
