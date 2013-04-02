@@ -125,10 +125,6 @@ public:   // constructors/destructors
 
     // just to take a look at the residual fields
     residField  = NULL;     registerScalar(residField,  "residField",  CV_DATA);
-    residField0 = NULL;     registerScalar(residField0, "residField0", CV_DATA);
-    residField1 = NULL;     registerScalar(residField1, "residField1", CV_DATA);
-    residField2 = NULL;     registerScalar(residField2, "residField2", CV_DATA);
-    residField3 = NULL;     registerScalar(residField3, "residField3", CV_DATA);
 
     local_dt = NULL;        registerScalar(local_dt, "local_dt", CV_DATA);
 
@@ -662,10 +658,6 @@ public:   // member variables
   double *massFlux_fa;      ///< mass flux for scalar solver
 
   double *residField;       ///< residual field for mean flow
-  double *residField0;      ///< residual field for scalar 0
-  double *residField1;      ///< residual field for scalar 1
-  double *residField2;      ///< residual field for scalar 2
-  double *residField3;      ///< residual field for scalar 3
   double resid_energ_th;    ///< energy residual threshold
 
   double *strMag;           ///< magnitude strain rate
@@ -1391,7 +1383,7 @@ public:   // member functions
   /** 
    * calculate wall distance: minimum distance of cv to wall face by looping over all cv's and faces 
    */
-  void calcWallDistance(double *phi, double *wd)
+  void calcWallDistance(int *wc, double *wd)
   {
     if (mpi_rank == 0)
       cout << "calc wall distance" << endl;
@@ -1499,15 +1491,7 @@ public:   // member functions
           minDist = dist;
         }
       }
-      
-/*      double fa_x[3] = {wall_fa[3*ifaSave], wall_fa[3*ifaSave+1], wall_fa[3*ifaSave+2]};
-      double fa_n[3] = {wall_fa_n[3*ifaSave], wall_fa_n[3*ifaSave+1], wall_fa_n[3*ifaSave+2]};
-      double n[3], s_half[3];
-      
-      normVec3d(n, fa_n);
-      vecMinVec3d(s_half, fa_x, x_cv[icv]);
-      wd[icv] = fabs(vecDotVec3d(s_half, n));*/
-      
+
       double fa_x[3] = {wall_fa[3*ifaSave], wall_fa[3*ifaSave+1], wall_fa[3*ifaSave+2]};
       double fa_n[3] = {wall_fa_n[3*ifaSave], wall_fa_n[3*ifaSave+1], wall_fa_n[3*ifaSave+2]};
       double n[3], s_half[3];
@@ -1525,27 +1509,8 @@ public:   // member functions
       if (dTang2 > specRadius2)   wd[icv] = minDist;
       else                        wd[icv] = fabs(vecDotVec3d(s_half, n));
 
-
-//      wd[icv] = minDist;
+      wc[icv] = ifaSave;
     }
-    /*
-    // correct closest wall
-    for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
-    if (zone->getKind() == FA_ZONE_BOUNDARY)
-    {
-      Param *param;
-      if (getParam(param, zone->getName()))
-        if (param->getString() == "WALL")
-        for (int ifa=zone->ifa_f; ifa<=zone->ifa_l; ifa++)
-        {
-          int icv0 = cvofa[ifa][0];
-          
-          double n[3], s_half[3];
-          double nmag = normVec3d(n, fa_normal[ifa]);
-          vecMinVec3d(s_half, x_fa[ifa], x_cv[icv0]);
-          wd[icv0] = fabs(vecDotVec3d(s_half, n));  //normVec3d(s_half);          
-        }
-    }*/
     
     MPI_Barrier(mpi_comm);
     

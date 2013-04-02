@@ -3,12 +3,12 @@
 
 #include "TurbModel_KOMSST.h"
 #include "TurbModel_V2F.h"
-#include "TurbModel_V2F_half.h"
+#include "TurbModel_KEps.h"
 
 
 //typedef RansTurbKOmSST TURB_MOD_FOR_ASBM; // define the turbulence model used with the ASBM
 //typedef RansTurbV2F TURB_MOD_FOR_ASBM;
-typedef RansTurbV2F_half TURB_MOD_FOR_ASBM;
+typedef RansTurbKEps TURB_MOD_FOR_ASBM;
 
 extern "C"{
   void asbm_(
@@ -200,8 +200,6 @@ public:   // member functions
         if ( step%block_frq == 0 ) calcBlockTensor();
         calcRsCenterASBM();
     }
-
-    TURB_MOD_FOR_ASBM::calcRansTurbViscMuet();
   }
 
   virtual void setNonLinearDomain(){
@@ -259,7 +257,7 @@ public:   // member functions
         wt_offdiag[icv][2] = 0.5*(grad_u[icv][1][2] - grad_u[icv][2][1])*tau;
     }
 
-    for (int i = 0; i < 1; i++)
+    for (int i = 0; i < 0; i++)
     {
       updateCvData(st_diag, REPLACE_ROTATE_DATA);
       updateCvData(st_offdiag, REPLACE_ROTATE_DATA);
@@ -315,11 +313,6 @@ public:   // member functions
                << " Cell-z: " << x_cv[icv][2] << endl;
         }
 
-        if (eps[icv] != eps[icv])
-        {
-          marker[icv] = 1;
-        }
-
         rij_diag[icv][0] = -REY[0][0]*2*kine[icv]*rho[icv];
         rij_diag[icv][1] = -REY[1][1]*2*kine[icv]*rho[icv];
         rij_diag[icv][2] = -REY[2][2]*2*kine[icv]*rho[icv];
@@ -347,6 +340,11 @@ public:   // member functions
         hatwt[icv] = CIR[0][2];
         hatst[icv] = CIR[1][2];
         ststa[icv] = CIR[2][2];
+
+        if (rij_offdiag[icv][0] != rij_offdiag[icv][0])
+        {
+          marker[icv] = 1;
+        }
     }
 
     MPI_Barrier(mpi_comm);
@@ -378,7 +376,7 @@ public:   // member functions
     updateCvData(rij_offdiag, REPLACE_ROTATE_DATA);
 
     // Smooth Outputs
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 0; i++)
     {
       smoothingVec(as_diag);
       smoothingVec(as_offdiag);
@@ -810,13 +808,13 @@ public:   // member functions
     cout << "rij_offdiag: " << rij_offdiag[icv][1] << endl;
     cout << "rij_offdiag: " << rij_offdiag[icv][2] << endl;
 
-    cout << "turbTS: " << turbTS[icv] << endl;
+    /*cout << "turbTS: " << turbTS[icv] << endl;
     cout << "tturb: " << tturb[icv] << endl;
     cout << "tkol: " << tkol[icv] << endl;
     cout << "trel: " << trel[icv] << endl;
     cout << "kine: " << kine[icv] << endl;
     cout << "eps:  " << eps[icv] << endl;
-    cout << "v2  : " << v2[icv] << endl;
+    cout << "v2  : " << v2[icv] << endl;*/
     cout << "str : " << strMag[icv] << endl << endl;
   }
 
@@ -826,6 +824,8 @@ public:   // member functions
     if (bphi_bfa  != NULL) {delete [] bphi_bfa;     bphi_bfa  = NULL;}
     if (grad_bphi != NULL) {delete [] grad_bphi;    grad_bphi = NULL;}
     if (mpi_rank == 0) fclose(finfo);
+
+    TURB_MOD_FOR_ASBM::finalHookScalarRansTurbModel();
   }
 };
 

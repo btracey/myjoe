@@ -61,6 +61,7 @@ public:   // constructors
     blendFuncF1 = NULL;       registerScalar(blendFuncF1, "blendFuncF1", CV_DATA);
     blendFuncF2 = NULL;       registerScalar(blendFuncF2, "blendFuncF2", CV_DATA);
     wallDist    = NULL;       registerScalar(wallDist, "wallDist",  CV_DATA);
+    wallConn    = NULL;       // array of integers
     turbTS      = NULL;       registerScalar(turbTS, "turbTS", CV_DATA);
     turbLS      = NULL;       registerScalar(turbLS, "turbLS", CV_DATA);
   }
@@ -69,11 +70,12 @@ public:   // constructors
 
 public:   // member vars
 
-  double *omega;                                        ///< turbulent scalars, introduced to have access to variables, results in to more readable code
+  double *omega;                                    ///< specific dissipation, introduced to have access to variables, results in to more readable code
   double (*grad_kine)[3], (*grad_omega)[3];
-  double *kine_bfa, *omega_bfa;                         ///< turbulent scalars at the boundary
-  double *muT;                                          ///< turbulent viscosity at cell center for output
-  double *wallDist;                                     ///< wall distance
+  double *kine_bfa, *omega_bfa;                     ///< turbulent scalars at the boundary
+  double *muT;                                      ///< turbulent viscosity at cell center for output
+  double *wallDist;                                 ///< distance to closest wall face
+  int *wallConn;                                    ///< index of closest wall face
   double *crossDiff, *blendFuncF1, *blendFuncF2;
   
   // limiter for shear stress
@@ -92,21 +94,8 @@ public:   // member functions
     if (mpi_rank == 0) 
       cout << "initialHook KOM SST model" << endl;
 
-    if (!checkParam("DO_NOT_CALC_WALLDIST"))
-    {
-      if (!checkDataFlag(wallDist))
-      {
-        for (int icv=0; icv<ncv; icv++)
-          wallDist[icv] = 0.0;
-
-        calcWallDistance(NULL, wallDist);
-      }
-    }
-    else
-    {
-      for (int icv=0; icv<ncv; icv++)
-        wallDist[icv] = 1.0e10;
-    }
+    wallConn = new int[ncv];
+    calcWallDistance(wallConn, wallDist);
 
     if (SST_limiterShearStress == 1)      limiterFunc = strMag;   // shear stress limiter = strain rate magnitude
     else                                  limiterFunc = vortMag;  // shear stress limiter = vorticity magnitude
@@ -142,35 +131,6 @@ public:   // member functions
 
     updateCvDataByName("kine", REPLACE_DATA);
     updateCvDataByName("omega", REPLACE_DATA);
-  }
-
-  virtual void calcMenterBlendingFunctions()
-  {
-
-    calcCvScalarGrad(grad_kine,  kine,  kine_bfa,  gradreconstruction, limiterNavierS, kine,  epsilonSDWLS);
-    calcCvScalarGrad(grad_omega, omega, omega_bfa, gradreconstruction, limiterNavierS, omega, epsilonSDWLS);
-
-    for (int icv=0; icv<ncv; icv++)
-    {
-      double d = wallDist[icv];
-      double mue = InterpolateAtCellCenterFromFaceValues(mul_fa, icv);
-
-      crossDiff[icv] = max(2.0*rho[icv]*sigma_om2/omega[icv]*vecDotVec3d(grad_kine[icv], grad_omega[icv]),  1.0e-20);
-//      crossDiff[icv] = min(crossDiff[icv], 10000.0);
-
-      double gamma1 = 500.0*mue/(pow(d, 2.0)*rho[icv]*omega[icv]);
-      double gamma2 = 4.0*sigma_om2*rho[icv]*kine[icv]/(d*d*crossDiff[icv]);
-      double gamma3 = sqrt(kine[icv])/(betaStar*omega[icv]*d);
-
-      double gamma = min(max(gamma1, gamma3), gamma2);
-      blendFuncF1[icv] = tanh(pow(gamma,4.0));
-      gamma = max(2.0*gamma3, gamma1);
-      blendFuncF2[icv] = tanh(pow(gamma,2.0));
-    }
-
-    updateCvData(crossDiff, REPLACE_DATA);
-    updateCvData(blendFuncF1, REPLACE_DATA);
-    updateCvData(blendFuncF2, REPLACE_DATA);
   }
   
   virtual void calcRansTurbViscMuet()
@@ -209,20 +169,20 @@ public:   // member functions
 
     // boundary faces
     for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
-    if (zone->getKind() == FA_ZONE_BOUNDARY)
-    {
-      if (zoneIsWall(zone->getName()))
-        for (int ifa=zone->ifa_f; ifa<=zone->ifa_l; ifa++)
-          mut_fa[ifa] = 0.0;                                     // set mut zero at walls
-      else
-        for (int ifa=zone->ifa_f; ifa<=zone->ifa_l; ifa++)
-        {
-          int icv0 = cvofa[ifa][0];
+      if (zone->getKind() == FA_ZONE_BOUNDARY)
+      {
+        if (zoneIsWall(zone->getName()))
+          for (int ifa=zone->ifa_f; ifa<=zone->ifa_l; ifa++)
+            mut_fa[ifa] = 0.0;                                     // set mut zero at walls
+        else
+          for (int ifa=zone->ifa_f; ifa<=zone->ifa_l; ifa++)
+          {
+            int icv0 = cvofa[ifa][0];
 
-          double zeta = min(1.0/omega[icv0], a1/(limiterFunc[icv0]*blendFuncF2[icv0]));
-          mut_fa[ifa] = min(max(rho[icv0]*kine[icv0]*zeta, 0.0), 1.0);
-        }
-    }
+            double zeta = min(1.0/omega[icv0], a1/(limiterFunc[icv0]*blendFuncF2[icv0]));
+            mut_fa[ifa] = min(max(rho[icv0]*kine[icv0]*zeta, 0.0), 1.0);
+          }
+      }
     
     // just for output and visulization
     for (int icv=0; icv<ncv; icv++)
@@ -322,27 +282,6 @@ public:   // member functions
     }
   }
 
-  inline double calcTurbTimeScale(const double &kine, const double &omega,
-                                  const double &str, const double &nu, int realizable)
-  {
-    double eps = betaStar*kine*omega;
-    double TimeScale = max(kine/eps, 2.0*sqrt(nu/eps));  //v2f has 6.0 instead of 2.0
-    if (realizable)
-      TimeScale = min(TimeScale, 1.0/(sqrt(6.0)*betaStar*str)); //this is not consistent with v2f
-    return TimeScale;
-  }
-
-  inline double calcTurbLengthScale(const double &kine, const double &omega,
-                                    const double &str, const double &nu, int realizable)
-  {
-    double CL = 0.23, CETA = 70.0;
-    double eps = betaStar*kine*omega;
-    double LengthScale = CL*max(pow(kine,1.5)/eps, CETA*pow(nu,0.75)/pow(eps,0.25));
-    if (realizable)
-      LengthScale = min(LengthScale, pow(kine,0.5)/(2.0/3.0*sqrt(3.0)*betaStar*str));
-    return LengthScale;
-  }
-
   virtual void sourceHookScalarRansTurb_new(double *rhs, double *A, const string &name, int flagImplicit)
   {
     if (name == "kine")
@@ -438,7 +377,6 @@ public:   // member functions
           for (int ifa=zone->ifa_f; ifa<=zone->ifa_l; ifa++)
           {
             int icv = cvofa[ifa][0];
-//            double muLamCV = calcMuLam(temp[icv]);
             double muLamCV = calcMuLam(icv);
             phi_fa[ifa] = 60.0*muLamCV/(rho[icv]*beta_1*wallDist[icv]*wallDist[icv]);
           }
@@ -446,21 +384,76 @@ public:   // member functions
     }
   }
 
+  virtual void calcMenterBlendingFunctions()
+  {
+    calcCvScalarGrad(grad_kine,  kine,  kine_bfa,  gradreconstruction, limiterNavierS, kine,  epsilonSDWLS);
+    calcCvScalarGrad(grad_omega, omega, omega_bfa, gradreconstruction, limiterNavierS, omega, epsilonSDWLS);
+
+    for (int icv=0; icv<ncv; icv++)
+    {
+      double d = wallDist[icv];
+      double mue = InterpolateAtCellCenterFromFaceValues(mul_fa, icv);
+
+      crossDiff[icv] = max(2.0*rho[icv]*sigma_om2/omega[icv]*vecDotVec3d(grad_kine[icv], grad_omega[icv]),  1.0e-20);
+//      crossDiff[icv] = min(crossDiff[icv], 10000.0);
+
+      double gamma1 = 500.0*mue/(pow(d, 2.0)*rho[icv]*omega[icv]);
+      double gamma2 = 4.0*sigma_om2*rho[icv]*kine[icv]/(d*d*crossDiff[icv]);
+      double gamma3 = sqrt(kine[icv])/(betaStar*omega[icv]*d);
+
+      double gamma = min(max(gamma1, gamma3), gamma2);
+      blendFuncF1[icv] = tanh(pow(gamma,4.0));
+      gamma = max(2.0*gamma3, gamma1);
+      blendFuncF2[icv] = tanh(pow(gamma,2.0));
+    }
+
+    updateCvData(crossDiff, REPLACE_DATA);
+    updateCvData(blendFuncF1, REPLACE_DATA);
+    updateCvData(blendFuncF2, REPLACE_DATA);
+  }
+
+  inline double calcTurbTimeScale(const double &kine, const double &omega,
+                                  const double &str, const double &nu, int realizable)
+  {
+    double eps = betaStar*kine*omega;
+    double TimeScale = max(kine/eps, 2.0*sqrt(nu/eps));  //v2f has 6.0 instead of 2.0
+    if (realizable)
+      TimeScale = min(TimeScale, 1.0/(sqrt(6.0)*betaStar*str)); //this is not consistent with v2f
+    return TimeScale;
+  }
+
+  inline double calcTurbLengthScale(const double &kine, const double &omega,
+                                    const double &str, const double &nu, int realizable)
+  {
+    double CL = 0.23, CETA = 70.0;
+    double eps = betaStar*kine*omega;
+    double LengthScale = CL*max(pow(kine,1.5)/eps, CETA*pow(nu,0.75)/pow(eps,0.25));
+    if (realizable)
+      LengthScale = min(LengthScale, pow(kine,0.5)/(2.0/3.0*sqrt(3.0)*betaStar*str));
+    return LengthScale;
+  }
+
   virtual void finalHookScalarRansTurbModel()
   {
-    if (mpi_rank == 0) cout << "calcRsBoussinesq()" << endl;
-    for (int icv = 0; icv < ncv; icv++)
+    if (wallConn != NULL) {delete [] wallConn; wallConn = NULL;}
+
+    if (checkParam("CALC_RS_BOUSS"))
     {
-      double term1 = (2.0/3.0) * rho[icv] * kine[icv];
-      // build Reynolds Stress tensor according to compressible formulation written above
-      rij_diag[icv][0] = -term1 + muT[icv] * 2.0 * (grad_u[icv][0][0] - 1.0/3.0*diverg[icv]);
-      rij_diag[icv][1] = -term1 + muT[icv] * 2.0 * (grad_u[icv][1][1] - 1.0/3.0*diverg[icv]);
-      rij_diag[icv][2] = -term1 + muT[icv] * 2.0 * (grad_u[icv][2][2] - 1.0/3.0*diverg[icv]);
-      rij_offdiag[icv][0] =     + muT[icv] * (grad_u[icv][0][1] + grad_u[icv][1][0]);
-      rij_offdiag[icv][1] =     + muT[icv] * (grad_u[icv][0][2] + grad_u[icv][2][0]);
-      rij_offdiag[icv][2] =     + muT[icv] * (grad_u[icv][1][2] + grad_u[icv][2][1]);
+      if (mpi_rank == 0)
+        cout << "calculating Rs Bouss" << endl;
+      for (int icv = 0; icv < ncv; icv++)
+      {
+        double term1 = (2.0/3.0) * rho[icv] * kine[icv];
+        rij_diag[icv][0] = -term1 + muT[icv] * 2.0 * (grad_u[icv][0][0] - 1.0/3.0*diverg[icv]);
+        rij_diag[icv][1] = -term1 + muT[icv] * 2.0 * (grad_u[icv][1][1] - 1.0/3.0*diverg[icv]);
+        rij_diag[icv][2] = -term1 + muT[icv] * 2.0 * (grad_u[icv][2][2] - 1.0/3.0*diverg[icv]);
+        rij_offdiag[icv][0] =     + muT[icv] * (grad_u[icv][0][1] + grad_u[icv][1][0]);
+        rij_offdiag[icv][1] =     + muT[icv] * (grad_u[icv][0][2] + grad_u[icv][2][0]);
+        rij_offdiag[icv][2] =     + muT[icv] * (grad_u[icv][1][2] + grad_u[icv][2][1]);
+      }
     }
   }
+
 };
 
 

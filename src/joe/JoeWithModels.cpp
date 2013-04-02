@@ -500,32 +500,13 @@ void JoeWithModels::runRK()
 
     for (int iScal = 0; iScal < nScal; iScal++)
     {
+      double *scalresid = scalarTranspEqVector[iScal].resid;
       for (int icv = 0; icv < ncv; icv++)
+      {
         myResidual[5+iScal] += fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
                                     + drhoScal3[iScal][icv])/6.0;
-
-      switch (iScal)
-      {
-      case 0:
-        for (int icv = 0; icv < ncv; icv++)
-          residField0[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
-    			          + drhoScal3[iScal][icv])/6.0;
-        break;
-      case 1:
-        for (int icv = 0; icv < ncv; icv++)
-          residField1[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
-    	                         + drhoScal3[iScal][icv])/6.0;
-        break;
-      case 2:
-        for (int icv = 0; icv < ncv; icv++)
-          residField2[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
-    	                         + drhoScal3[iScal][icv])/6.0;
-        break;
-      case 3:
-        for (int icv = 0; icv < ncv; icv++)
-          residField3[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
-    	                         + drhoScal3[iScal][icv])/6.0;
-        break;
+        scalresid[icv] = fabs(drhoScal1[iScal][icv] + 4.0*drhoScal2[iScal][icv]
+                              + drhoScal3[iScal][icv])/6.0;
       }
     }
 
@@ -723,6 +704,13 @@ void JoeWithModels::runBackwardEuler()
       rhs[icv][4] = underRelax*RHSrhoE[icv];
 
       residField[icv] = RHSrhou[icv][0];
+      /*if (icv == 7443){
+        if (mpi_rank == 0){
+        cout << "Bad: "<< icv << endl;
+        cout << "residField: " << residField[icv] << endl;
+        cout << "loc: " << x_cv[icv][0] << " " << x_cv[icv][1] << endl;}
+      }*/
+
 
       double tmp = cv_volume[icv]/(local_dt[icv]);
       for (int i = 0; i < 5; i++)
@@ -745,7 +733,6 @@ void JoeWithModels::runBackwardEuler()
     updateCvData(rhoE, REPLACE_DATA);
 
     UpdateCvDataStateVec(dq);                                       // update dq since neighbors needed to compute RHS of scalars
-
 
     // ---------------------------------------------------------------------------------
     // solve linear system for the scalars
@@ -783,15 +770,6 @@ void JoeWithModels::runBackwardEuler()
 
         scalresid[icv] = rhsScal[iScal][icv];
       }
-      
-
-      /*switch (iScal)
-      {
-      case 0: for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhsScal[iScal][icv]; break;
-      case 1: for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhsScal[iScal][icv]; break;
-      case 2: for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhsScal[iScal][icv]; break;
-      case 3: for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhsScal[iScal][icv]; break;
-      }*/
 
       solveLinSysScalar(dScal[iScal], AScal[iScal][5], rhsScal[iScal],
                         scalarTranspEqVector[iScal].phiZero,
@@ -864,7 +842,7 @@ void JoeWithModels::runBackwardEuler()
 
     temporalHook();
     dumpProbes(step, 0.0);
-    //if (step >= 62)
+    //if (step >= 70)
       writeData(step);
 
 
@@ -891,7 +869,7 @@ void JoeWithModels::runBackwardEuler()
   finalHookScalarRansTurbModel();
   finalHook();
 
-  writeData(step);
+  //writeData(step);
   writeRestart();
 
 
@@ -2309,7 +2287,6 @@ void JoeWithModels::calcRhs(double *rhs_rho, double (*rhs_rhou)[3], double *rhs_
   sourceHookRansTurb(rhs_rho, rhs_rhou, rhs_rhoE, A);
   sourceHookRansComb(rhs_rho, rhs_rhou, rhs_rhoE, A);
 
-
   // =======================================================================================
   // SCALARS
   // =======================================================================================
@@ -3331,16 +3308,18 @@ void JoeWithModels::calcViscousFluxNS(double *rhs_rho, double (*rhs_rhou)[3], do
   //        compute gradients, with boundary values
   // ====================================================================
 	
-	string ViscLim = getStringParam("VISC_LIMITER","YES");
-	if (ViscLim == "YES") {
-		if (sndOrder != true)
-			calcCvVectorGrad(grad_u, vel, vel_bfa, gradreconstruction, limiterNavierS, sos, epsilonSDWLS);
-		calcCvScalarGrad(grad_enthalpy, enthalpy, h_bfa, gradreconstruction, limiterNavierS, enthalpy, epsilonSDWLS);
-	}
-	else {
-		calcCvVectorGrad(grad_u, vel, vel_bfa, gradreconstruction, NOLIMITER, sos, epsilonSDWLS);
-		calcCvScalarGrad(grad_enthalpy, enthalpy, h_bfa, gradreconstruction, NOLIMITER, enthalpy, epsilonSDWLS);
-	}
+  string ViscLim = getStringParam("VISC_LIMITER","YES");
+  if (ViscLim == "YES")
+  {
+    if (sndOrder != true)
+      calcCvVectorGrad(grad_u, vel, vel_bfa, gradreconstruction, limiterNavierS, sos, epsilonSDWLS);
+    calcCvScalarGrad(grad_enthalpy, enthalpy, h_bfa, gradreconstruction, limiterNavierS, enthalpy, epsilonSDWLS);
+  }
+  else
+  {
+    calcCvVectorGrad(grad_u, vel, vel_bfa, gradreconstruction, NOLIMITER, sos, epsilonSDWLS);
+    calcCvScalarGrad(grad_enthalpy, enthalpy, h_bfa, gradreconstruction, NOLIMITER, enthalpy, epsilonSDWLS);
+  }
 	
   // ====================================================================
   // cycle through internal faces, assembling flux and matrix
@@ -3409,6 +3388,24 @@ void JoeWithModels::calcViscousFluxNS(double *rhs_rho, double (*rhs_rhou)[3], do
         }
       }
     }
+
+    /*if (mpi_rank == 1)
+      if (ifa == 42876){
+        cout << "Res: " << Frhou[0];
+        cout << "fa_normal: " << fa_normal[ifa][0] << ", " << fa_normal[ifa][1] << ", " << fa_normal[ifa][2] << endl;
+        cout << "mut_fa: " << mut_fa[ifa] << endl;
+        cout << "mul_fa: " << mul_fa[ifa] << endl;
+        cout << "kine_fa: " << kine_fa << endl;
+      }
+
+    if (mpi_rank == 1)
+      if (ifa == 45778){
+        cout << "Res: " << Frhou[0];
+        cout << "fa_normal: " << fa_normal[ifa][0] << ", " << fa_normal[ifa][1] << ", " << fa_normal[ifa][2] << endl;
+        cout << "mut_fa: " << mut_fa[ifa] << endl;
+        cout << "mul_fa: " << mul_fa[ifa] << endl;
+        cout << "kine_fa: " << kine_fa << endl;
+      }*/
 
     // icv0 is always valid...
     for (int i = 0; i < 3; i++)
@@ -4086,21 +4083,9 @@ void JoeWithModels::runBackwardEulerCoupled()
 
     for (int iScal = 0; iScal < nScal; iScal ++)
     {
-      switch (iScal)
-      {
-      case 0:
-    	for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhs[icv][5+iScal];
-    	break;
-      case 1:
-  	    for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhs[icv][5+iScal];
-  	    break;
-      case 2:
-  	    for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhs[icv][5+iScal];
-  	    break;
-      case 3:
-  	    for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhs[icv][5+iScal];
-  	    break;
-      }
+      double *scalresid = scalarTranspEqVector[iScal].resid;
+      for (int icv = 0; icv < ncv; icv++)
+        scalresid[icv] = rhs[icv][5+iScal];
     }
     // ---------------------------------------------------------------------------------
     // solve linear system for the NSE
@@ -5602,21 +5587,9 @@ void JoeWithModels::runBackwardEulerSemiCoupled()
 
     for (int iScal = 0; iScal < nScalCoupled; iScal ++)
     {
-      switch (iScal)
-      {
-      case 0:
-    	for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhs[icv][5+iScal];
-    	break;
-      case 1:
-  	    for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhs[icv][5+iScal];
-  	    break;
-      case 2:
-  	    for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhs[icv][5+iScal];
-  	    break;
-      case 3:
-  	    for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhs[icv][5+iScal];
-  	    break;
-      }
+      double *scalresid = scalarTranspEqVector[iScal].resid;
+      for (int icv = 0; icv < ncv; icv++)
+        scalresid[icv] = rhs[icv][5+iScal];
     }
     // ---------------------------------------------------------------------------------
     // solve linear system for the NSE
@@ -5699,21 +5672,9 @@ void JoeWithModels::runBackwardEulerSemiCoupled()
                                            - AScal[iScalUncoupled][4][noc] * dq[nbocv_v[noc]][4];
         }
 
-        switch (iScal)
-        {
-        case 0:
-        	for (int icv = 0; icv < ncv; icv++) residField0[icv] = rhsScal[iScalUncoupled][icv];
-        	break;
-        case 1:
-        	for (int icv = 0; icv < ncv; icv++) residField1[icv] = rhsScal[iScalUncoupled][icv];
-        	break;
-        case 2:
-        	for (int icv = 0; icv < ncv; icv++) residField2[icv] = rhsScal[iScalUncoupled][icv];
-        	break;
-        case 3:
-        	for (int icv = 0; icv < ncv; icv++) residField3[icv] = rhsScal[iScalUncoupled][icv];
-        	break;
-        }
+        double *scalresid = scalarTranspEqVector[iScal].resid;
+        for (int icv = 0; icv < ncv; icv++)
+          scalresid[icv] = rhsScal[iScalUncoupled][icv];
 
         solveLinSysScalar(dScal[iScalUncoupled], AScal[iScalUncoupled][5], rhsScal[iScalUncoupled],
                           scalarTranspEqVector[iScal].phiZero,

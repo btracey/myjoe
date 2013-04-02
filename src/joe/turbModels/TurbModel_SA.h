@@ -42,16 +42,18 @@ public:   // constructors
     vortMag  = NULL;      registerScalar(vortMag, "vortMag", CV_DATA);
     muT      = NULL;      registerScalar(muT, "muT", CV_DATA);
     wallDist = NULL;      registerScalar(wallDist, "wallDist",  CV_DATA);
+    wallConn = NULL;      // array of integers
   }
 
   virtual ~RansTurbSA() {}
 
 public:   // member vars
 
-  double *nuSA;                             ///< turbulent scalars, introduced to have access to variables, results in to more readable code
-  double *nuSA_bfa;                         ///< turbulent scalars at the boundary
-  double *muT;                              ///< turbulent viscosity at cell center for output
-  double *wallDist;                         ///< wall distance
+  double *nuSA;                     ///< turbulent scalar, introduced to have access to variables, results in to more readable code
+  double *nuSA_bfa;                 ///< turbulent scalar at the boundary
+  double *muT;                      ///< turbulent viscosity at cell center for output
+  double *wallDist;                 ///< distance to closest wall face
+  int *wallConn;                    ///< index of closest wall face
   
   double cv1_3, cw1, cw2, cw3_6, sigma, cb1, cb2, KarmanConst_2;
 
@@ -61,18 +63,10 @@ public:   // member functions
   {
     if (mpi_rank == 0) 
       cout << "initialHook SA model" << endl;
-    
-    if (!checkParam("DO_NOT_CALC_WALLDIST"))
-    {
-      if (!checkDataFlag(wallDist))
-      {
-        for (int icv=0; icv<ncv; icv++)
-          wallDist[icv] = 0.0;
       
-        calcWallDistance(NULL, wallDist);
-      }    
-    }
-    
+    wallConn = new int[ncv];
+    calcWallDistance(wallConn, wallDist);
+
     // connect pointers 
     ScalarTranspEq *eq = getScalarTransportData("nuSA");      nuSA = eq->phi;       nuSA_bfa = eq->phi_bfa;
 
@@ -445,6 +439,11 @@ public:   // member functions
         A[noc00][5+nuSA_Index][5+nuSA_Index] -= (d_H1 + d_H2) * cv_volume[icv];
       }
     }
+  }
+
+  virtual void finalHookScalarRansTurbModel()
+  {
+    if (wallConn != NULL) {delete [] wallConn; wallConn = NULL;}
   }
 
 };

@@ -133,7 +133,7 @@ public:
   /*
    * write all values, WARNING: should be used only for small grids.
    */
-  void writeAllValues()
+  virtual void writeAllValues()
   {
     FILE *fp;
     if ( mpi_rank ==0)
@@ -158,24 +158,24 @@ public:
 
     for (int icv = 0; icv < ncv; icv++)
     {
-      fprintf(fp, "%.8le\t%.8le\t%.8le\t%.8le\t%.8le\t%.8le\t",
+      fprintf(fp, "%.12le\t%.12le\t%.12le\t%.12le\t%.12le\t%.12le\t",
           x_cv[icv][0], x_cv[icv][1], rho[icv], rhou[icv][0], rhou[icv][1],press[icv]);
 
       for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
-        fprintf(fp, "%.8le\t", data->phi[icv]);
+        fprintf(fp, "%.12le\t", data->phi[icv]);
 
-      fprintf(fp, "%.8le\t", InterpolateAtCellCenterFromFaceValues(mul_fa, icv));
+      fprintf(fp, "%.12le\t", InterpolateAtCellCenterFromFaceValues(mul_fa, icv));
 
-      fprintf(fp, "%.8le\t", grad_u[icv][0][1]);
+      fprintf(fp, "%.12le\t", grad_u[icv][0][1]);
 
       double *muT = getR1("muT");
-      fprintf(fp, "%.8le\t", muT[icv]);
+      fprintf(fp, "%.12le\t", muT[icv]);
 
       // Reynolds stresses
-      fprintf(fp, "%.8le\t", rij_diag[icv][0]);
-      fprintf(fp, "%.8le\t", rij_diag[icv][1]);
-      fprintf(fp, "%.8le\t", rij_diag[icv][2]);
-      fprintf(fp, "%.8le\t", rij_offdiag[icv][0]);
+      fprintf(fp, "%.12le\t", rij_diag[icv][0]);
+      fprintf(fp, "%.12le\t", rij_diag[icv][1]);
+      fprintf(fp, "%.12le\t", rij_diag[icv][2]);
+      fprintf(fp, "%.12le\t", rij_offdiag[icv][0]);
 
       fprintf(fp, "\n");
     }
@@ -819,7 +819,7 @@ public:
 
       fclose(ifile);
       if (mpi_rank == 0)
-        cout << "FINISHED READING INLET PROFILE" << endl;
+        cout << "finished reading inlet profile" << endl;
     }
 
     // Specify initial condition over whole flow
@@ -1057,6 +1057,23 @@ public:
     wallD->clearFlag();
   }
 
+  virtual void temporalHook()
+  {
+    if (step%10000 == 0)
+    {
+      writeAllValues();
+
+      for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+        if (zone->getKind() == FA_ZONE_BOUNDARY)
+        {
+          Param *param;
+          if (getParam(param, zone->getName()))
+            if (param->getString() == "WALL")
+              writeWallValues(zone->getName());
+        }
+    }
+  }
+
   virtual void finalHook()
   {
     writeAllValues();
@@ -1116,7 +1133,7 @@ public:
 
       fclose(ifile);
       if (mpi_rank == 0)
-        cout << "FINISHED READING INLET PROFILE" << endl;
+        cout << "finished reading inlet profiles" << endl;
     }
 
     // Specify initial condition over whole flow
@@ -1485,7 +1502,7 @@ public:
 
         fclose(ifile);
         if (mpi_rank == 0)
-          cout << "FINISHED READING INLET PROFILE" << endl;
+          cout << "finished reading inlet profiles" << endl;
       }
 
       // Specify initial condition over whole flow
@@ -1532,8 +1549,8 @@ public:
             double kine2 = boundVal[pos][5];
             kine[icv] = kine1+fi*(kine2-kine1);
 
-            double eps1 = 0.09*boundVal[pos-1][5]*boundVal[pos-1][6];
-            double eps2 = 0.09*boundVal[pos][5]*boundVal[pos][6];
+            double eps1 = boundVal[pos-1][6]; //0.09*boundVal[pos-1][5]*boundVal[pos-1][6];
+            double eps2 = boundVal[pos][6]; //0.09*boundVal[pos][5]*boundVal[pos][6];
             eps[icv] = eps1+fi*(eps2-eps1);
           }
 
@@ -1655,7 +1672,7 @@ public:
 
   virtual void boundaryHookScalarRansTurb(double *phi_ph, FaZone *zone, const string &name)
   {
-    RansTurbV2F_half::boundaryHookScalarRansTurb(phi_ph, zone, name);
+    RansTurbKEps::boundaryHookScalarRansTurb(phi_ph, zone, name);
 
     Param *param;
 
@@ -1701,8 +1718,8 @@ public:
             else if (x_fa[ifa][1] < boundVal[pos-1][0]) fi = 0.0;
             else    fi = (x_fa[ifa][1]-boundVal[pos-1][0])/(boundVal[pos][0]-boundVal[pos-1][0]);
 
-            double eps1 = 0.09*boundVal[pos-1][5]*boundVal[pos-1][6];
-            double eps2 = 0.09*boundVal[pos][5]*boundVal[pos][6];
+            double eps1 = boundVal[pos-1][6]; //0.09*boundVal[pos-1][5]*boundVal[pos-1][6];
+            double eps2 = boundVal[pos][6]; //0.09*boundVal[pos][5]*boundVal[pos][6];
             phi_ph[ifa] =  (eps1 + fi*(eps2-eps1));
 
           }
