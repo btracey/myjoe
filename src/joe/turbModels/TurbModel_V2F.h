@@ -71,8 +71,6 @@ public:
     fsrc1  = NULL;       registerScalar(fsrc1, "fsrc1", CV_DATA);
     fsrc2  = NULL;       registerScalar(fsrc2, "fsrc2", CV_DATA);
     fsrc3  = NULL;       registerScalar(fsrc3, "fsrc3", CV_DATA);
-    fsrc4  = NULL;       registerScalar(fsrc4, "fsrc4", CV_DATA);
-    fsrc5  = NULL;       registerScalar(fsrc5, "fsrc5", CV_DATA);
     tturb  = NULL; registerScalar(tturb, "tturb", CV_DATA);
     tkol   = NULL; registerScalar(tkol, "tkol", CV_DATA);
     trel   = NULL; registerScalar(trel, "trel", CV_DATA);
@@ -91,7 +89,7 @@ public:
   
   double C_MU, SIG_K, SIG_D, CEPS1, CEPS2, C1, C2, CETA, CL, ALPHA, ENN;
 
-  double *fsrc1, *fsrc2, *fsrc3, *fsrc4, *fsrc5, *tturb, *tkol, *trel, *lkol, *lrel, *lturb;
+  double *fsrc1, *fsrc2, *fsrc3, *tturb, *tkol, *trel, *lkol, *lrel, *lturb;
 
   int V2F_LIMIT_PK;   ///< limiter for tke production: 0 ... no
                      ///                              1 ... yes
@@ -100,48 +98,13 @@ public:
   virtual void initialHookScalarRansTurbModel()
   {
     if (mpi_rank == 0) 
-      cout << "initialHook V2F model" << endl;
+      cout << "initialHook() for V2F" << endl;
 
     ScalarTranspEq *eq;
     eq = getScalarTransportData("kine");     kine = eq->phi;      kine_bfa = eq->phi_bfa;
     eq = getScalarTransportData("eps");      eps = eq->phi;       eps_bfa = eq->phi_bfa;
     eq = getScalarTransportData("v2");       v2 = eq->phi;        v2_bfa = eq->phi_bfa;
     eq = getScalarTransportData("f");        f = eq->phi;         f_bfa = eq->phi_bfa;
-    
-    // initialize from *.in file
-    double turb[2];
-    Param *pmy;
-    if (getParam(pmy, "INITIAL_CONDITION_TURB"))
-    {
-      turb[0] = pmy->getDouble(1);
-      turb[1] = pmy->getDouble(2);
-    }
-    else
-    {
-      cerr << " Could not find the parameter INITIAL_CONDITION_TURB to set the initial field "<< endl;
-      throw(-1);
-    }
-
-    if (!checkScalarFlag("kine"))
-      for (int icv = 0; icv < ncv; icv++)
-        kine[icv] = turb[0];
-
-    if (!checkScalarFlag("eps"))
-      for (int icv = 0; icv < ncv; icv++)
-        eps[icv] = turb[1];
-
-    if (!checkScalarFlag("v2"))
-      for (int icv = 0; icv < ncv; icv++)
-        v2[icv] = 2.0/3.0*kine[icv];
-
-    if (!checkScalarFlag("f"))
-      for (int icv = 0; icv < ncv; icv++)
-        f[icv] = 0.0;
-
-    updateCvDataByName("kine", REPLACE_DATA);
-    updateCvDataByName("eps", REPLACE_DATA);
-    updateCvDataByName("v2", REPLACE_DATA);
-    updateCvDataByName("f", REPLACE_DATA);
   }
 
   virtual void calcRansTurbViscMuet()
@@ -200,12 +163,12 @@ public:
       turbTS[icv] = calcTurbTimeScale(kine[icv], eps[icv], v2[icv], strMag[icv], calcMuLam(icv)/rho[icv], 1);
       turbLS[icv] = calcTurbLengthScale(kine[icv], eps[icv], v2[icv], strMag[icv], calcMuLam(icv)/rho[icv], 1);
 
-      tturb[icv] = kine[icv]/eps[icv];
+      /*tturb[icv] = kine[icv]/eps[icv];
       tkol[icv] = 6.0*sqrt(calcMuLam(icv)/rho[icv]/eps[icv]);
       trel[icv] = kine[icv]/(sqrt(3.0)*v2[icv]*C_MU*strMag[icv]);
       lturb[icv] = CL*pow(kine[icv],1.5)/eps[icv];
       lkol[icv] = CL*CETA*pow(calcMuLam(icv)/rho[icv],0.75)/pow(eps[icv],0.25);
-      lrel[icv] = pow(kine[icv],1.5)/(sqrt(3.0)*v2[icv]*C_MU*strMag[icv] + 1.0e-14);
+      lrel[icv] = pow(kine[icv],1.5)/(sqrt(3.0)*v2[icv]*C_MU*strMag[icv] + 1.0e-14);*/
     }
   }
 
@@ -320,11 +283,9 @@ public:
 
             rhs[icv] += src*cv_volume[icv];
 
-            fsrc1[icv] = 1.0/TS*((C1-ENN)*min(v2[icv]/kine[icv],0.666666)-(C1-1.0)*(2./3.)) - C2*getTurbProd(icv, 1)/(kine[icv]*rho[icv]);
+            /*fsrc1[icv] = 1.0/TS*((C1-ENN)*min(v2[icv]/kine[icv],0.666666)-(C1-1.0)*(2./3.)) - C2*getTurbProd(icv, 1)/(kine[icv]*rho[icv]);
             fsrc2[icv] = 1.0/TS; //-f[icv]/LS2;
-            fsrc3[icv] = v2[icv]/kine[icv]; //-fsrc1[icv]/LS2;
-            fsrc4[icv] = getTurbProd(icv,1)/(kine[icv]*rho[icv]);
-            fsrc5[icv] = 1.0/LS2;
+            fsrc3[icv] = v2[icv]/kine[icv]; //-fsrc1[icv]/LS2;*/
 
             if (flagImplicit)
               {

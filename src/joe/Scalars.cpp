@@ -216,6 +216,31 @@ void UgpWithCvCompFlow::calcViscousFluxScalar_new(double *rhs_rhoScal, double *A
         }
       }
       // .............................................................................................
+      // PROFILES BOUNDARY CONDITION
+      // .............................................................................................
+      else if (scalarZoneIsProfiles(zone->getName(), scalName))
+      {
+        if ((step == 1) && (mpi_rank == 0))
+          cout << scalName << ": " << zone->getName() << " is PROFILES" << endl;
+
+        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+        {
+          int icv0 = cvofa[ifa][0];
+          int noc00 = nbocv_i[icv0];
+          double n[3] = {0.0, 0.0, 0.0}, s_half[3] = {0.0, 0.0, 0.0};
+          double nmag = normVec3d(n, fa_normal[ifa]);
+          vecMinVec3d(s_half, x_fa[ifa], x_cv[icv0]);
+          double smag_half = fabs(vecDotVec3d(s_half, n));   //normVec3d(s_half);
+          //double alpha = vecDotVec3d(n, s_half);           // HACK alfa should be always 1 at the boundary (provide such a grid!)
+
+          double viscFlux = diff[ifa] * nmag * (phi_bfa[ifa] - phi[icv0]) / smag_half;
+          rhs_rhoScal[icv0] += viscFlux;
+
+          if (flagImplicit)
+            AScal[noc00] += diff[ifa] * nmag / smag_half / rho[icv0];
+        }
+      }
+      // .............................................................................................
       // DIRICHLET BOUNDARY CONDITION
       // .............................................................................................
       else if (scalarZoneIsDirichlet(phiBCval, zone->getName(), scalName))
@@ -270,6 +295,7 @@ void UgpWithCvCompFlow::setScalarBC(FaZone *zone)
     double phiBCval = 0.0, phiBCflux = 0.0;
 
     double *phi_fa = scal->phi_bfa;
+    double *phi_pr = scal->phi_bpr;
 
     if (zone->getKind() == FA_ZONE_BOUNDARY)
     {
@@ -281,6 +307,20 @@ void UgpWithCvCompFlow::setScalarBC(FaZone *zone)
         // user defined boundary hook
         boundaryHookScalarRansTurb(phi_fa, &(*zone), scalName);
         boundaryHookScalarRansComb(phi_fa, &(*zone), scalName);
+      }
+      // .............................................................................................
+      // PROFILES BOUNDARY CONDITION
+      // .............................................................................................
+      else if (scalarZoneIsProfiles(zone->getName(), scalName))
+      {
+        for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+        {
+          int icv0 = cvofa[ifa][0];
+          if (vecDotVec3d(vel_bfa[ifa], fa_normal[ifa]) > 1.0e-8)
+            phi_fa[ifa] = scal->phi[icv0];
+          else
+            phi_fa[ifa] = phi_pr[ifa];
+        }
       }
       // .............................................................................................
       // DIRICHLET BOUNDARY CONDITION

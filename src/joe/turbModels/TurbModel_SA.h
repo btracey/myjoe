@@ -69,14 +69,6 @@ public:   // member functions
 
     // connect pointers 
     ScalarTranspEq *eq = getScalarTransportData("nuSA");      nuSA = eq->phi;       nuSA_bfa = eq->phi_bfa;
-
-    double init_nuSA = getDoubleParam("INIT_NU_SA", "1.0e-6");
-    
-    if (!checkScalarFlag("nuSA"))
-      for (int icv=0; icv<ncv; icv++)
-        nuSA[icv] = init_nuSA; // arbitrary value  
-
-    updateCvDataByName("nuSA", REPLACE_DATA);
   }
 
   virtual void calcRansTurbViscMuet()

@@ -77,43 +77,18 @@ public:   // member functions
       cout << "initialHook WILCOX KOM model" << endl;
 
     if (!checkParam("DO_NOT_CALC_WALLDIST"))
-    if (!checkDataFlag(wallDist))
-    {
-      for (int icv=0; icv<ncv; icv++)
-        wallDist[icv] = 0.0;
+      if (!checkDataFlag(wallDist))
+      {
+        for (int icv=0; icv<ncv; icv++)
+          wallDist[icv] = 0.0;
 
-      calcWallDistance(NULL, wallDist);
-    }
+        calcWallDistance(NULL, wallDist);
+      }
 
     // connect pointers
     ScalarTranspEq *eq;
     eq = getScalarTransportData("kine");    kine = eq->phi;     kine_bfa = eq->phi_bfa;   grad_kine = eq->grad_phi;
     eq = getScalarTransportData("omega");   omega = eq->phi;    omega_bfa = eq->phi_bfa;  grad_omega = eq->grad_phi;
-
-    double kineInit, omegaInit;
-    Param *pmy;
-    if (getParam(pmy, "INITIAL_CONDITION_TURB"))
-    {
-      kineInit = pmy->getDouble(1);
-      omegaInit = pmy->getDouble(2);
-    }
-    else
-    {
-      if (mpi_rank == 0)
-        cerr << " Could not find the parameter INITIAL_CONDITION_TURB to set the initial field "<< endl;
-      throw(-1);
-    }
-
-    if (!checkScalarFlag("kine"))
-      for (int icv=0; icv<ncv; icv++)
-        kine[icv] = kineInit;
-
-    if (!checkScalarFlag("omega"))
-      for (int icv=0; icv<ncv; icv++)
-        omega[icv] = omegaInit;
-
-    updateCvDataByName("kine", REPLACE_DATA);
-    updateCvDataByName("omega", REPLACE_DATA);
   }
 
   virtual void calcRansTurbViscMuet()

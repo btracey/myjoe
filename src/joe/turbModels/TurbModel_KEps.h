@@ -81,7 +81,6 @@ public:   // member vars
   double *kine_bfa, *eps_bfa;       ///< turbulent scalars at the boundary
   double *muT;                      ///< turbulent viscosity at cell center for output
   double *fmu, *f2;                 ///< Chien damping functions
-
   double *yplus;                    ///< distance to closest wall in wall units
   double *wallDist;                 ///< distance to closest wall face
   int *wallConn;                    ///< index of closest wall face
@@ -109,33 +108,8 @@ public:   // member functions
 
     // connect pointers 
     ScalarTranspEq *eq;
-    eq = getScalarTransportData("kine");    kine = eq->phi;     kine_bfa = eq->phi_bfa;    
-    eq = getScalarTransportData("eps");     eps = eq->phi;      eps_bfa = eq->phi_bfa;
-
-    // initialize scalars
-    double kineInit, epsInit;
-    Param *pmy;
-    if (getParam(pmy, "INITIAL_CONDITION_TURB"))
-    {
-      kineInit = pmy->getDouble(1);
-      epsInit = pmy->getDouble(2);
-    }
-    else
-    {
-      cerr << " Could not find the parameter INITIAL_CONDITION_TURB to set the initial field "<< endl;
-      throw(-1);
-    }
-
-    if (!checkScalarFlag("kine"))
-      for (int icv=0; icv<ncv; icv++)
-        kine[icv] = kineInit;
-
-    if (!checkScalarFlag("eps"))
-      for (int icv=0; icv<ncv; icv++)
-        eps[icv] = epsInit;
-
-    updateCvDataByName("kine", REPLACE_DATA);
-    updateCvDataByName("eps", REPLACE_DATA);
+    eq = getScalarTransportData("kine");  kine = eq->phi;   kine_bfa = eq->phi_bfa;
+    eq = getScalarTransportData("eps");   eps = eq->phi;    eps_bfa = eq->phi_bfa;
 
     // wall distance and connectivity
     wallConn = new int[ncv];
@@ -270,8 +244,8 @@ public:   // member functions
       for (int icv=0; icv<ncv; icv++)
       {
         double muLamCv = calcMuLam(icv);
-        double TS = calcTurbTimeScale(kine[icv], eps[icv], strMag[icv], muLamCv/rho[icv], realizable);
-        /*double src = (CEPS1*calcTurbProd(icv) - CEPS2*f2[icv]*rho[icv]*eps[icv])/TS
+        /*double TS = calcTurbTimeScale(kine[icv], eps[icv], strMag[icv], muLamCv/rho[icv], realizable);
+        double src = (CEPS1*calcTurbProd(icv) - CEPS2*f2[icv]*rho[icv]*eps[icv])/TS
                    - 2.0*muLamCv*eps[icv]*exp(-0.5*yplus[icv])/(wallDist[icv]*wallDist[icv]);*/
 
         double src = CEPS1*calcTurbProd(icv)*eps[icv]/kine[icv] - CEPS2*f2[icv]*rho[icv]*eps[icv]*eps[icv]/kine[icv]

@@ -17,7 +17,7 @@ COMMON = mpi_tommie.o MpiStuff.o Gp.o MiscUtils.o Ugp.o Param.o UgpWithTools.o C
 COMMON_OBJS = $(addprefix $(MUM_HOME)/src/common/, $(COMMON))
 
 # joe.o not included on purpose since user can have own joe.cpp
-JOE_OBJS = UgpWithCvCompFlow.o Scalars.o JoeWithModels.o asbm.o
+JOE_OBJS = UgpWithCvCompFlow.o Scalars.o JoeWithModels.o asbm.o easm.o
 OBJS_AUX = $(COMMON_OBJS) $(JOE_OBJS) joe.o
 JOE_LIBS = $(CLIBS) -lm
 
@@ -68,5 +68,8 @@ JoeWithModels.o: JoeWithModels.cpp $(JoeWithModels_H)
 asbm.o: asbm.f90
 	$(F90) -c asbm.f90
 	
+easm.o: easm.f90
+	$(F90) -c easm.f90
+
 clean:
 	rm $(OBJS) $(MUM_HOME)/bin/joe 

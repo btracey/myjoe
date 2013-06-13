@@ -2586,6 +2586,7 @@ public:
   void writeData(const int step) {
     for (list<WriteData>::iterator wd = writeDataList.begin(); wd!=writeDataList.end(); wd++)
       wd->write(step, this);
+
   }
 
   void initWriteData(ParamMap * params);

@@ -4,16 +4,22 @@
 #include "TurbModel_KOMSST.h"
 #include "TurbModel_V2F.h"
 #include "TurbModel_KEps.h"
+#include "TurbModel_ASBMKEps.h"
 
-
-//typedef RansTurbKOmSST TURB_MOD_FOR_ASBM; // define the turbulence model used with the ASBM
+// define the turbulence model used with the ASBM
+//typedef RansTurbKOmSST TURB_MOD_FOR_ASBM;
 //typedef RansTurbV2F TURB_MOD_FOR_ASBM;
-typedef RansTurbKEps TURB_MOD_FOR_ASBM;
+//typedef RansTurbKEps TURB_MOD_FOR_ASBM;
+typedef RansTurbASBMKEps TURB_MOD_FOR_ASBM;
 
 extern "C"{
   void asbm_(
       double*, double*, double*, double*, double*, double*,
-      double*, double*, double*, int*, int*);
+      double*, double*, double*, int*, int*, int*);
+
+  void easm_(
+      double*, double*, double*, double*, double*, double*,
+      double*, double*, double*, int*, int*, int*);
 }
 
 class RansTurbASBM : virtual public TURB_MOD_FOR_ASBM
@@ -50,6 +56,8 @@ public:   // constructors
     hatst         = NULL;     registerScalar(hatst,         "hatst",         CV_DATA);
     ststa         = NULL;     registerScalar(ststa,         "ststa",         CV_DATA);
     marker        = NULL;     // this is an integer array
+    rij_diag_nd   = NULL;     registerVector(rij_diag_nd,    "rij_diag_nd",  CV_DATA);
+    rij_offdiag_nd = NULL;    registerVector(rij_offdiag_nd, "rij_offdiag_nd", CV_DATA);
 
     // Blocking variables
     block_diag    = NULL;     registerVector(block_diag,    "block_diag",    CV_DATA);
@@ -65,6 +73,8 @@ protected:   // member vars
 
   // General variables
   int      start_asbm;            // iteration number at which ASBM starts
+  int      n_smooth;              // # of times to smooth data
+  int      easmflag;
 
   double   (*st_diag)[3];         // diagonal rate of strain tensor times tau
   double   (*st_offdiag)[3];      // off-diagonal rate of strain tensor times tau
@@ -84,10 +94,13 @@ protected:   // member vars
   double   *scal_chi;
 
   // For debugging only
+  int      *marker;
   double   *hatwt;
   double   *hatst;
   double   *ststa;
-  int      *marker;
+
+  double (*rij_diag_nd)[3];
+  double (*rij_offdiag_nd)[3];
 
   // Blocking variables
   double   (*block_diag)[3];      // diagonal blockage tensor
@@ -96,6 +109,7 @@ protected:   // member vars
   double   *bphi_bfa;             // phi for wall blocking at boundaries
   double   (*grad_bphi)[3];       // gradients for wall blocking phi
 
+  int      block_rij;             // block r_ij instead of a_ij
   int      block_frq;             // frequency of blocking computation
   int      block_maxIter;         // linear solver parameters
   double   block_zeroAbs;
@@ -111,10 +125,13 @@ public:   // member functions
     TURB_MOD_FOR_ASBM::initialHookScalarRansTurbModel();
 
     if (mpi_rank == 0)
-      cout << "initialHook ASBM" << endl;
+      cout << "initialHook() for ASBM" << endl;
 
     start_asbm = getIntParam("START_ASBM", "0");
-    block_frq = getIntParam("BLOCK_FRQ","10");
+    n_smooth   = getIntParam("N_SMOOTH", "0");
+    block_frq  = getIntParam("BLOCK_FRQ","10");
+    block_rij  = getIntParam("BLOCK_RIJ", "0");
+    easmflag   = getIntParam("EASM","0");
 
     if (!checkParam("LINEAR_SOLVER_BLOCK_TRESHOLDS"))
     {
@@ -138,6 +155,32 @@ public:   // member functions
       }
       else
         cout << "Opened file asbmInfo.dat" << endl;
+
+      cout << "ASBM properties" << endl;
+      switch(LIMIT_PK)
+      {
+      case 0: cout << "    PK limiter: no" << endl; break;
+      case 1: cout << "    PK limiter: yes" << endl; break;
+      }
+      switch(RIJ_BASED_PK)
+      {
+      case 0: cout << "    PK based on ASBM stresses: no" << endl; break;
+      case 1: cout << "    Pk based on ASBM stresses: yes" << endl; break;
+      }
+      switch(VEL_SCALE)
+      {
+      case 0:  cout<<"    Velocity scale = VY          "<<endl; break;
+      case 1:  cout<<"    Velocity scale = VNXY        "<<endl; break;
+      case 11: cout<<"    Velocity scale = VNXYXY      "<<endl; break;
+      case 2:  cout<<"    Velocity scale = VNXZ        "<<endl; break;
+      case 3:  cout<<"    Velocity scale = 0.66 TKE    "<<endl; break;
+      default: cout<<"    Velocity scale = v2 from v2f "<<endl; break;
+      }
+      switch(block_rij)
+      {
+      case 0: cout <<"    Blocking rij: no" << endl; break;
+      case 1: cout <<"    Blocking rij: yes" << endl; break;
+      }
     }
 
     // Initialize cell centered data
@@ -190,16 +233,21 @@ public:   // member functions
 
   virtual void calcRansTurbViscMuet()
   {
-    TURB_MOD_FOR_ASBM::calcRansTurbViscMuet();
+    calcGradVel();
+    calcStrainRateAndDivergence();
+    calcTurbTimeScale();
+    calcTurbLengthScale();
 
     // Non-linear domain partitioning
     if (step == start_asbm) setNonLinearDomain();
 
     // Computation of ASBM variables
     if (step >= start_asbm){
-        if ( step%block_frq == 0 ) calcBlockTensor();
-        calcRsCenterASBM();
+      if ( step%block_frq == 0 ) calcBlockTensor();
+      calcRsCenterASBM();
     }
+
+    TURB_MOD_FOR_ASBM::calcRansTurbViscMuet();
   }
 
   virtual void setNonLinearDomain(){
@@ -257,7 +305,7 @@ public:   // member functions
         wt_offdiag[icv][2] = 0.5*(grad_u[icv][1][2] - grad_u[icv][2][1])*tau;
     }
 
-    for (int i = 0; i < 0; i++)
+    for (int i = 0; i < n_smooth; i++)
     {
       updateCvData(st_diag, REPLACE_ROTATE_DATA);
       updateCvData(st_offdiag, REPLACE_ROTATE_DATA);
@@ -274,79 +322,97 @@ public:   // member functions
     // ====================================================================
     for (int icv = 0; icv < ncv; icv++){
 
-        // Anisotropic rate of strain tensor, sij = 0.5*(dui_dxj + duj_dxi) - 1/3*divg
-        ST[0][0] = st_diag[icv][0];     ST[0][1] = st_offdiag[icv][0];     ST[0][2] = st_offdiag[icv][1];
-        ST[1][0] = ST[0][1];            ST[1][1] = st_diag[icv][1];        ST[1][2] = st_offdiag[icv][2];
-        ST[2][0] = ST[0][2];            ST[2][1] = ST[1][2];               ST[2][2] = st_diag[icv][2];
+      // Anisotropic rate of strain tensor, sij = 0.5*(dui_dxj + duj_dxi) - 1/3*divg
+      ST[0][0] = st_diag[icv][0];     ST[0][1] = st_offdiag[icv][0];     ST[0][2] = st_offdiag[icv][1];
+      ST[1][0] = ST[0][1];            ST[1][1] = st_diag[icv][1];        ST[1][2] = st_offdiag[icv][2];
+      ST[2][0] = ST[0][2];            ST[2][1] = ST[1][2];               ST[2][2] = st_diag[icv][2];
 
-        // Rate of mean rotation tensor, C TO FORTRAN, NEED TRANSPOSE: wij = -0.5*(dui_dxj - duj_dxi)
-        WT[0][0] = 0.0;                 WT[0][1] = -wt_offdiag[icv][0];    WT[0][2] = -wt_offdiag[icv][1];
-        WT[1][0] = -WT[0][1];           WT[1][1] = 0.0;                    WT[1][2] = -wt_offdiag[icv][2];
-        WT[2][0] = -WT[0][2];           WT[2][1] = -WT[1][2];              WT[2][2] = 0.0;
+      // Rate of mean rotation tensor, C TO FORTRAN, NEED TRANSPOSE: wij = -0.5*(dui_dxj - duj_dxi)
+      WT[0][0] = 0.0;                 WT[0][1] = -wt_offdiag[icv][0];    WT[0][2] = -wt_offdiag[icv][1];
+      WT[1][0] = -WT[0][1];           WT[1][1] = 0.0;                    WT[1][2] = -wt_offdiag[icv][2];
+      WT[2][0] = -WT[0][2];           WT[2][1] = -WT[1][2];              WT[2][2] = 0.0;
 
-        // Blockage tensor
-        BL[0][0] = block_diag[icv][0];  BL[0][1] = block_offdiag[icv][0];  BL[0][2] = block_offdiag[icv][1];
-        BL[1][0] = BL[0][1];            BL[1][1] = block_diag[icv][1];     BL[1][2] = block_offdiag[icv][2];
-        BL[2][0] = BL[0][2];            BL[2][1] = BL[1][2];               BL[2][2] = block_diag[icv][2];
+      // Blockage tensor
+      BL[0][0] = block_diag[icv][0];  BL[0][1] = block_offdiag[icv][0];  BL[0][2] = block_offdiag[icv][1];
+      BL[1][0] = BL[0][1];            BL[1][1] = block_diag[icv][1];     BL[1][2] = block_offdiag[icv][2];
+      BL[2][0] = BL[0][2];            BL[2][1] = BL[1][2];               BL[2][2] = block_diag[icv][2];
 
-        // Strained and rotated A's
-        AS[0][0] = as_diag[icv][0];     AS[0][1] = as_offdiag[icv][0];     AS[0][2] = as_offdiag[icv][1];
-        AS[1][0] = AS[0][1];            AS[1][1] = as_diag[icv][1];        AS[1][2] = as_offdiag[icv][2];
-        AS[2][0] = AS[0][2];            AS[2][1] = AS[1][2];               AS[2][2] = as_diag[icv][2];
+      // Strained and rotated A's
+      AS[0][0] = as_diag[icv][0];     AS[0][1] = as_offdiag[icv][0];     AS[0][2] = as_offdiag[icv][1];
+      AS[1][0] = AS[0][1];            AS[1][1] = as_diag[icv][1];        AS[1][2] = as_offdiag[icv][2];
+      AS[2][0] = AS[0][2];            AS[2][1] = AS[1][2];               AS[2][2] = as_diag[icv][2];
 
-        AR[0][0] = ar_diag[icv][0];     AR[0][1] = ar_offdiag[icv][0];     AR[0][2] = ar_offdiag[icv][1];
-        AR[1][0] = AR[0][1];            AR[1][1] = ar_diag[icv][1];        AR[1][2] = ar_offdiag[icv][2];
-        AR[2][0] = AR[0][2];            AR[2][1] = AR[1][2];               AR[2][2] = ar_diag[icv][2];
+      AR[0][0] = ar_diag[icv][0];     AR[0][1] = ar_offdiag[icv][0];     AR[0][2] = ar_offdiag[icv][1];
+      AR[1][0] = AR[0][1];            AR[1][1] = ar_diag[icv][1];        AR[1][2] = ar_offdiag[icv][2];
+      AR[2][0] = AR[0][2];            AR[2][1] = AR[1][2];               AR[2][2] = ar_diag[icv][2];
 
-        // Call the ASBM
-        ierr = 0;
+      // Call the ASBM
+      ierr = 0;
 
+      if(easmflag==0)
         asbm_(&(ST[0][0]), &(WT[0][0]), &(WFT[0][0]), &(BL[0][0]), &(AS[0][0]), &(AR[0][0]),
-              &(REY[0][0]), &(DIM[0][0]), &(CIR[0][0]), &maxitrs, &ierr);
+              &(REY[0][0]), &(DIM[0][0]), &(CIR[0][0]), &maxitrs, &block_rij, &ierr);
+      else
+        easm_(&(ST[0][0]), &(WT[0][0]), &(WFT[0][0]), &(BL[0][0]), &(AS[0][0]), &(AR[0][0]),
+              &(REY[0][0]), &(DIM[0][0]), &(CIR[0][0]), &maxitrs, &block_rij, &ierr);
 
-        if (ierr != 0)
-        {
-          myNerr ++;
-          cout << "ASBM error number " << ierr << " in cell " << icv << endl;
-          cout << "Cell-x: " << x_cv[icv][0]
-               << " Cell-y: " << x_cv[icv][1]
-               << " Cell-z: " << x_cv[icv][2] << endl;
-        }
+      if (ierr != 0)
+      {
+        myNerr ++;
+        cout << "ASBM error number " << ierr << " in cell " << icv << endl;
+        cout << "Cell-x: " << x_cv[icv][0]
+             << " Cell-y: " << x_cv[icv][1]
+             << " Cell-z: " << x_cv[icv][2] << endl;
+      }
 
-        rij_diag[icv][0] = -REY[0][0]*2*kine[icv]*rho[icv];
-        rij_diag[icv][1] = -REY[1][1]*2*kine[icv]*rho[icv];
-        rij_diag[icv][2] = -REY[2][2]*2*kine[icv]*rho[icv];
+      rij_diag[icv][0] = -REY[0][0]*2*kine[icv]*rho[icv];
+      rij_diag[icv][1] = -REY[1][1]*2*kine[icv]*rho[icv];
+      rij_diag[icv][2] = -REY[2][2]*2*kine[icv]*rho[icv];
 
-        rij_offdiag[icv][0] = -REY[0][1]*2*kine[icv]*rho[icv];
-        rij_offdiag[icv][1] = -REY[0][2]*2*kine[icv]*rho[icv];
-        rij_offdiag[icv][2] = -REY[1][2]*2*kine[icv]*rho[icv];
+      rij_offdiag[icv][0] = -REY[0][1]*2*kine[icv]*rho[icv];
+      rij_offdiag[icv][1] = -REY[0][2]*2*kine[icv]*rho[icv];
+      rij_offdiag[icv][2] = -REY[1][2]*2*kine[icv]*rho[icv];
 
-        as_diag[icv][0] = AS[0][0];       as_offdiag[icv][0] = AS[0][1];
-        as_diag[icv][1] = AS[1][1];       as_offdiag[icv][1] = AS[0][2];
-        as_diag[icv][2] = AS[2][2];       as_offdiag[icv][2] = AS[1][2];
+      as_diag[icv][0] = AS[0][0];       as_offdiag[icv][0] = AS[0][1];
+      as_diag[icv][1] = AS[1][1];       as_offdiag[icv][1] = AS[0][2];
+      as_diag[icv][2] = AS[2][2];       as_offdiag[icv][2] = AS[1][2];
 
-        ar_diag[icv][0] = AR[0][0];       ar_offdiag[icv][0] = AR[0][1];
-        ar_diag[icv][1] = AR[1][1];       ar_offdiag[icv][1] = AR[0][2];
-        ar_diag[icv][2] = AR[2][2];       ar_offdiag[icv][2] = AR[1][2];
+      ar_diag[icv][0] = AR[0][0];       ar_offdiag[icv][0] = AR[0][1];
+      ar_diag[icv][1] = AR[1][1];       ar_offdiag[icv][1] = AR[0][2];
+      ar_diag[icv][2] = AR[2][2];       ar_offdiag[icv][2] = AR[1][2];
 
-        scal_phi[icv] = CIR[0][0];
-        scal_bet[icv] = CIR[1][0];
-        scal_chi[icv] = CIR[2][0];
+      scal_phi[icv] = CIR[0][0];
+      scal_bet[icv] = CIR[1][0];
+      scal_chi[icv] = CIR[2][0];
 
-        etar[icv] = CIR[0][1];
-        etaf[icv] = CIR[1][1];
-        a2[icv]   = CIR[2][1];
+      etar[icv] = CIR[0][1];
+      etaf[icv] = CIR[1][1];
+      a2[icv]   = CIR[2][1];
 
-        hatwt[icv] = CIR[0][2];
-        hatst[icv] = CIR[1][2];
-        ststa[icv] = CIR[2][2];
+      hatwt[icv] = CIR[0][2];
+      hatst[icv] = CIR[1][2];
+      ststa[icv] = CIR[2][2];
 
-        if (rij_offdiag[icv][0] != rij_offdiag[icv][0])
-        {
-          marker[icv] = 1;
-        }
+      if (rij_offdiag[icv][0] != rij_offdiag[icv][0])
+        marker[icv] = 1;
+
+      rij_diag_nd[icv][0] = REY[0][0];
+      rij_diag_nd[icv][1] = REY[1][1];
+      rij_diag_nd[icv][2] = REY[2][2];
+
+      rij_offdiag_nd[icv][0] = REY[0][1];
+      rij_offdiag_nd[icv][1] = REY[0][2];
+      rij_offdiag_nd[icv][2] = REY[1][2];
     }
 
+    updateCvData(as_diag, REPLACE_ROTATE_DATA);
+    updateCvData(as_offdiag, REPLACE_ROTATE_DATA);
+    updateCvData(ar_diag, REPLACE_ROTATE_DATA);
+    updateCvData(ar_offdiag, REPLACE_ROTATE_DATA);
+    updateCvData(rij_diag, REPLACE_ROTATE_DATA);
+    updateCvData(rij_offdiag, REPLACE_ROTATE_DATA);
+
+    // Write nan's to screen
     MPI_Barrier(mpi_comm);
     if (mpi_rank != 0)
     {
@@ -356,7 +422,8 @@ public:   // member functions
     }
 
     for (int icv = 0; icv < ncv; icv++)
-      if (marker[icv] == 1){
+      if (marker[icv] == 1)
+      {
         writeDiagnostics(icv);
         marker[icv] = 0;
       }
@@ -368,15 +435,8 @@ public:   // member functions
     }
     MPI_Barrier(mpi_comm);
 
-    updateCvData(as_diag, REPLACE_ROTATE_DATA);
-    updateCvData(as_offdiag, REPLACE_ROTATE_DATA);
-    updateCvData(ar_diag, REPLACE_ROTATE_DATA);
-    updateCvData(ar_offdiag, REPLACE_ROTATE_DATA);
-    updateCvData(rij_diag, REPLACE_ROTATE_DATA);
-    updateCvData(rij_offdiag, REPLACE_ROTATE_DATA);
-
     // Smooth Outputs
-    for (int i = 0; i < 0; i++)
+    for (int i = 0; i < n_smooth; i++)
     {
       smoothingVec(as_diag);
       smoothingVec(as_offdiag);
@@ -384,7 +444,6 @@ public:   // member functions
       smoothingVec(ar_offdiag);
       smoothingVec(rij_diag);
       smoothingVec(rij_offdiag);
-      //smoothingScal(eps);
 
       updateCvData(as_diag, REPLACE_ROTATE_DATA);
       updateCvData(as_offdiag, REPLACE_ROTATE_DATA);
@@ -392,7 +451,6 @@ public:   // member functions
       updateCvData(ar_offdiag, REPLACE_ROTATE_DATA);
       updateCvData(rij_diag, REPLACE_ROTATE_DATA);
       updateCvData(rij_offdiag, REPLACE_ROTATE_DATA);
-      //updateCvData(eps, REPLACE_DATA);
     }
 
     // ====================================================================
@@ -497,7 +555,7 @@ public:   // member functions
     // ====================================================================
     // Output error file
     // ====================================================================
-    MPI_Reduce(&myNerr,&Nerr,1,MPI_DOUBLE,MPI_SUM,0,mpi_comm);
+    MPI_Reduce(&myNerr,&Nerr,1,MPI_INT,MPI_SUM,0,mpi_comm);
     if (mpi_rank == 0)
     {
       if (finfo == NULL)

@@ -14,7 +14,7 @@
 !
 !==============================================================================80
 
-  subroutine asbm(st, wt, wft, bl, as, ar, rey, dmn, cir, ktrmax, ierr)
+  subroutine asbm(st, wt, wft, bl, as, ar, rey, dmn, cir, ktrmax, bl_rij, ierr)
     implicit none
     integer, parameter  :: dp = selected_real_kind(15, 307) !double precision
 
@@ -31,14 +31,17 @@
     real(dp), dimension(3,3), intent(out)   :: dmn  !dimensionality
     real(dp), dimension(3,3), intent(out)   :: cir  !circulicity
 
-    integer, intent(in)                     :: ktrmax !max iters for N-R
-    integer, intent(inout)                  :: ierr   !error flag
+    integer, intent(in)                     :: ktrmax  !max iters for N-R
+    integer, intent(in)                     :: bl_rij  !wall blocking type 
+    integer, intent(inout)                  :: ierr    !error flag
+ 
 
     ! constants
     real(dp), parameter                     :: a0 = 1.4_dp
     real(dp), parameter                     :: a01 = (2.1_dp - a0) / 2.0_dp
 
     real(dp), parameter                     :: zero = 0.0_dp
+    real(dp), parameter                     :: small = 0.001_dp
     real(dp), parameter                     :: fifth = 0.2_dp
     real(dp), parameter                     :: fourth = 0.25_dp
     real(dp), parameter                     :: third = 1.0_dp / 3.0_dp
@@ -57,7 +60,7 @@
     ! variables
     integer                  :: i,j,k,l,m,n   !do loop indices
     integer                  :: ktr           !iteration index for N-R
-    integer                  :: id, idx       !indeces for N-R vector & matrix
+    integer                  :: id, idx       !indeces for N-R vector & matrix   
     integer, dimension(3,3)  :: index =                                         & 
       reshape((/1, 2, 3, 2, 4, 5, 3, 5, 6/),(/3, 3/))
 
@@ -662,7 +665,7 @@
     end do
 
     ! compute structure parameters
-    eta_c1 = hat_wt/(hat_st)
+    eta_c1 = hat_wt/(hat_st + small)
     !eta_c1 = hat_wt/hat_st
     eta_c2 = hat_wtt/hat_st
     
@@ -670,8 +673,19 @@
     if ((eta_c2 < zero) .or. (eta_c2 /= eta_c2)) eta_c2 = zero
 
     eta_r = sqrt(eta_c1)
-    eta_f = eta_r - sign(sqrt(eta_c2),hat_x)
+    eta_f = zero 
 
+    do i = 1,3
+      do j = 1,3
+        do k = 1,3
+          hat_wt  = hat_wt + a(i,j)*wt(i,k)*wt(j,k)
+          hat_wtt = hat_wtt + a(i,j)*wtt(i,k)*wtt(j,k)
+          hat_st  = hat_st + a(i,j)*st(i,k)*st(j,k)
+          hat_x   = hat_x + a(i,j)*wtt(j,k)*st(k,i)
+        end do
+      end do
+    end do
+    
     ! compute phis, chis, bets
     if (hat_st < zero) then
       ! without strain
@@ -725,15 +739,17 @@
     scl_g = bet*sqrt(scl_g)
 
     ! IMPOSE BLOCKAGE MODIFICATIONS
-    ! blockage correction to eddy-axis tensor
-    call blocking(a,bl,delta,ierr)
+    if (bl_rij == 0) then
+      ! blockage correction to eddy-axis tensor
+      call blocking(a,bl,delta,ierr)
 
-    ! blockage correction to phi and gamma
-    trace_bl = bl(1,1) + bl(2,2) + bl(3,3)
+      ! blockage correction to phi and gamma
+      trace_bl = bl(1,1) + bl(2,2) + bl(3,3)
 
-    phi = one - (one - trace_bl)**2 + phi*(one - trace_bl)**2
-    scl_g = (one - trace_bl)*scl_g
-    !chi = (one - trace_bl)*chi
+      phi = one - (one - trace_bl)**2 + phi*(one - trace_bl)**2
+      scl_g = (one - trace_bl)*scl_g
+      !chi = (one - trace_bl)*chi
+    endif
     
     if (rotation_t) then
     ! compute helical vector
@@ -749,6 +765,12 @@
     ! COMPUTE STRUCTURE TENSORS
     call structure(rey, dmn, cir, a, phi, chi, vec_g, vec_wdt,           &
                    dot_vec_wdt, rotation_t, delta, eps, ierr)
+
+    if (bl_rij == 1) then
+      ! blockage correction to Reynolds stress tensor
+      ! Note: The other tensors need to be updated
+      call blocking(rey,bl,delta,ierr)
+    endif
 
     ! Output some useful data
     cir(1,1) = phi

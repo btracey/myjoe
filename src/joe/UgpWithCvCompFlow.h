@@ -137,10 +137,9 @@ public:   // constructors/destructors
     
     alpha_rho = NULL;       // register only for second order euler flux to limit scalars
 
-    strMag = NULL;
+    strMag  = NULL;
     vortMag = NULL;
-    diverg = NULL;
-
+    diverg  = NULL;
 
     // ----------------------------------------------------------------------------------------
     // register flow parameters
@@ -523,6 +522,9 @@ public:   // constructors/destructors
     gam_bfa = new double[nfa_b];
     RoM_bfa = new double[nfa_b];
 
+    rho_bpr = new double[nfa_b];
+    vel_bpr = new double[nfa_b][3];
+    p_bpr   = new double[nfa_b];
     // ----------------------------------------------------------------------------------------
     // init memory for face-based data
     // ----------------------------------------------------------------------------------------
@@ -548,6 +550,7 @@ public:   // constructors/destructors
     for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
     {
       data->phi_bfa  = new double[nfa_b];
+      data->phi_bpr  = new double[nfa_b];
       data->grad_phi = new double[ncv_g][3];
       if (data->reconstruction == "CONSERVATIVE")
       {
@@ -590,6 +593,9 @@ public:   // constructors/destructors
     if (gam_bfa != NULL)         {delete [] gam_bfa;        gam_bfa = NULL;}
     if (RoM_bfa != NULL)         {delete [] RoM_bfa;        RoM_bfa = NULL;}
     
+    if (rho_bpr != NULL)         {delete [] rho_bpr;        rho_bpr = NULL;}
+    if (vel_bpr != NULL)         {delete [] vel_bpr;        vel_bpr = NULL;}
+    if (p_bpr   != NULL)         {delete [] p_bpr;          p_bpr   = NULL;}
     
     if (massFlux_fa != NULL)       {delete [] massFlux_fa;       massFlux_fa = NULL;}
     if (mut_fa      != NULL)       {delete [] mut_fa;            mut_fa      = NULL;}
@@ -597,12 +603,13 @@ public:   // constructors/destructors
     if (lamOcp_fa   != NULL)       {delete [] lamOcp_fa;         lamOcp_fa   = NULL;}
 
     if (nonLinear      != NULL)    {delete [] nonLinear;         nonLinear   = NULL;}
-    if (rij_diag_fa    != NULL)    {delete []rij_diag_fa;            rij_diag_fa    = NULL;}
-    if (rij_offdiag_fa != NULL)    {delete []rij_offdiag_fa;         rij_offdiag_fa = NULL;}
+    if (rij_diag_fa    != NULL)    {delete []rij_diag_fa;        rij_diag_fa    = NULL;}
+    if (rij_offdiag_fa != NULL)    {delete []rij_offdiag_fa;     rij_offdiag_fa = NULL;}
 
     for (ScalarTranspEqIterator data = scalarTranspEqVector.begin(); data < scalarTranspEqVector.end(); data++)
     {
       if (data->phi_bfa     != NULL)     {delete [] data->phi_bfa;            data->phi_bfa     = NULL;}
+      if (data->phi_bpr     != NULL)     {delete [] data->phi_bpr;            data->phi_bpr     = NULL;}
       if (data->grad_phi    != NULL)     {delete [] data->grad_phi;           data->grad_phi    = NULL;}
       if (data->rhophi      != NULL)     {delete [] data->rhophi;             data->rhophi      = NULL;}
       if (data->rhophi_bfa  != NULL)     {delete [] data->rhophi_bfa;         data->rhophi_bfa  = NULL;}
@@ -668,6 +675,8 @@ public:   // member variables
   // boundary faces, allocate memory, TODO: should be incorporated in to the associated arrays ???
   // ----------------------------------------------------------------------------------------
   double *rho_bfa, *T_bfa, (*vel_bfa)[3], *p_bfa, *h_bfa, *gam_bfa, *RoM_bfa;
+
+  double *rho_bpr, (*vel_bpr)[3], *p_bpr; // user specified profiles at boundaries
 
   double (*grad_enthalpy)[3]; ///< enthalpy gradient, registered only if 2nd order euler flux calc turned on
   double (*grad_rho)[3];      ///< density gradient, registered only if 2nd order euler flux calc turned on
@@ -1877,6 +1886,20 @@ public:   // member functions
     if (getParam(p, faName + "." + scalName)) {
       string name = p->getString(1);
       retVal = (name == "HOOK") || (name == "Hook")|| (name == "hook");
+    } else
+      retVal = 0;
+
+    return retVal;
+  }
+
+  int scalarZoneIsProfiles(const string &faName, const string &scalName) {
+
+    Param *p;
+    int retVal = 0;
+
+    if (getParam(p, faName + "." + scalName)) {
+      string name = p->getString(1);
+      retVal = (name == "PROFILES");
     } else
       retVal = 0;
 

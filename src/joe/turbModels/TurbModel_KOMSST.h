@@ -92,7 +92,7 @@ public:   // member functions
   virtual void initialHookScalarRansTurbModel()
   {
     if (mpi_rank == 0) 
-      cout << "initialHook KOM SST model" << endl;
+      cout << "initialHook() for KOMSST" << endl;
 
     wallConn = new int[ncv];
     calcWallDistance(wallConn, wallDist);
@@ -104,33 +104,6 @@ public:   // member functions
     ScalarTranspEq *eq;
     eq = getScalarTransportData("kine");      kine = eq->phi;    kine_bfa = eq->phi_bfa;   grad_kine = eq->grad_phi;
     eq = getScalarTransportData("omega");     omega = eq->phi;   omega_bfa = eq->phi_bfa;  grad_omega = eq->grad_phi;
-    
-
-    // set initial condition if parameter given in Joe.in
-
-    double kineInit, omegaInit;
-    if (checkParam("INITIAL_CONDITION_TURB"))
-    {
-      kineInit = getParam("INITIAL_CONDITION_TURB")->getDouble(1);
-      omegaInit = getParam("INITIAL_CONDITION_TURB")->getDouble(2);
-    }
-    else
-    {
-      cout << "Could not find the parameter INITIAL_CONDITION_TURB to set the initial field "<< endl;
-      throw(-1);
-    }
-
-    if (!checkScalarFlag("kine"))
-      for (int icv=0; icv<ncv; icv++)
-        kine[icv] = kineInit;
-
-    if (!checkScalarFlag("omega"))
-      for (int icv=0; icv<ncv; icv++)
-        omega[icv] = omegaInit;
-
-
-    updateCvDataByName("kine", REPLACE_DATA);
-    updateCvDataByName("omega", REPLACE_DATA);
   }
   
   virtual void calcRansTurbViscMuet()
@@ -425,7 +398,7 @@ public:   // member functions
   inline double calcTurbLengthScale(const double &kine, const double &omega,
                                     const double &str, const double &nu, int realizable)
   {
-    double CL = 0.23, CETA = 70.0;
+    double CL = 0.3, CETA = 70.0;
     double eps = betaStar*kine*omega;
     double LengthScale = CL*max(pow(kine,1.5)/eps, CETA*pow(nu,0.75)/pow(eps,0.25));
     if (realizable)

@@ -53,6 +53,7 @@ public:
 
   double *phi;                            ///< scalar field
   double *phi_bfa;                        ///< scalar boundary values 
+  double *phi_bpr;                        ///< scalar user specified boundary profiles
   double (*grad_phi)[3];                  ///< scalar gradients
   double *resid;                          ///< residual field
 
@@ -79,6 +80,7 @@ public:
   {
     phi      = NULL;
     phi_bfa  = NULL;
+    phi_bpr  = NULL;
     grad_phi = NULL;
     resid    = NULL;
 

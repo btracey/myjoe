@@ -17,15 +17,15 @@ void JoeWithModels::run()
 	  if (mpi_rank == 0)
 	    cout << "RESET_STEP: " << step << endl;
 	}
+
+        // initialize Navier-Stokes equations
+        initialHook();
 	
 	// initialize models
 	initialHookScalarRansTurbModel();
 	initialHookScalarRansCombModel();
-	
-	// initialize Navier-Stokes equations
-	initialHook(); 
-	
-	// initialize Linele for preconditioning
+
+	// initialize Linelet for preconditioning
 	string SolverName = getStringParam("LINEAR_SOLVER_NS");
 	string SemiName   = getStringParam("SEMICOARSENING","NO");
 	if ((SolverName == "BCGSTAB_LINELET") || (SemiName == "YES")) initializeLinelet();
@@ -47,6 +47,320 @@ void JoeWithModels::run()
 	    cerr << "available integration schemes are: FORWARD_EULER, RK, BACKWARD_EULER, BDF2, BACKWARD_EULER_COUPLED, BACKWARD_EULER_SEMICOUPLED" << endl;
 	  }
 
+}
+
+void JoeWithModels::initialHook()
+{
+  int nScal = scalarTranspEqVector.size();
+
+  // ============================================================================
+  // SET THE INITIAL CONDITIONS
+  // ============================================================================
+  if (mpi_rank == 0)
+    cout << "initialHook()"<< endl;
+
+  if (!checkDataFlag(gamma))
+  {
+    double gamma_init = GAMMA ;
+    for (int icv=0; icv<ncv; icv++)
+      gamma[icv] = gamma_init ;
+  }
+
+  Param *param;
+  if (getParam(param, "INIT_PROFILES"))
+  {
+    // -------------------------------------------------------------------------
+    // Initialize mean flow from given initial profiles
+    // -------------------------------------------------------------------------
+    string fileIC = param->getString();
+    FILE *fp;
+    if ((fp = fopen(fileIC.c_str(), "rt")) == NULL)
+    {
+      cout << "could not open the file "<< fileIC << endl;
+      throw(-1);
+    }
+
+    // read the inlet profiles
+    int nnIC, nval;
+    fscanf(fp,"n=%d\td=%d", &nnIC, &nval);
+    if ((nval-5) != nScal)
+    {
+      cout << "file " << fileIC << "does not have required number of inputs" << endl;
+      throw(-1);
+    }
+
+    double **profilesIC = new double *[nnIC];
+    for (int i = 0; i < nnIC; i++)
+      profilesIC[i] = new double [nval];
+
+    // file has variables y, rho, u, v, press, ...
+    for (int i = 0; i < nnIC; i++)
+      for (int v = 0; v < nval; v++)
+        fscanf(fp, "%lf", &profilesIC[i][v]);
+
+    fclose(fp);
+    if (mpi_rank == 0)
+      cout << "finished reading " << fileIC << endl;
+
+    // initialize the domain
+    if(!checkDataFlag(rho))
+    {
+      for (int icv=0; icv<ncv; icv++)
+      {
+        int pos = 1;
+        // while pos and pos-1 dont sandwich x_cv, keep increasing pos
+        while(profilesIC[pos][0] < x_cv[icv][1] && (pos < nnIC-1))       pos++;
+
+        double fi;
+        // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
+        if      (x_cv[icv][1] > profilesIC[pos][0])    fi = 1.0;
+        // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
+        else if (x_cv[icv][1] < profilesIC[pos-1][0])  fi = 0.0;
+        else    fi = (x_cv[icv][1] - profilesIC[pos-1][0])/(profilesIC[pos][0] - profilesIC[pos-1][0]);
+
+        double rho1 = profilesIC[pos-1][1];
+        double rho2 = profilesIC[pos][1];
+        rho[icv] = rho1 + fi*(rho2 - rho1);
+
+        double uvel1 = profilesIC[pos-1][2];
+        double uvel2 = profilesIC[pos][2];
+        rhou[icv][0] = uvel1*rho1 + fi*(uvel2*rho2 - uvel1*rho1);
+        rhou[icv][1] = rhou[icv][2] = 0.0;
+
+        double press1 = profilesIC[pos-1][4];
+        double press2 = profilesIC[pos][4];
+        press[icv] = press1 + fi*(press2 - press1);
+
+        double kine1 = profilesIC[pos-1][5];
+        double kine2 = profilesIC[pos][5];
+        double tmp_kine = kine1 + fi*(kine2 - kine1);
+
+        rhoE[icv] = press[icv]/(gamma[icv]-1.0) + 0.5/rho[icv]*vecDotVec3d(rhou[icv],rhou[icv])
+                    +rho[icv]*tmp_kine;
+      }
+    }
+    updateCvData(rhou, REPLACE_ROTATE_DATA);
+    updateCvData(rho,  REPLACE_DATA);
+    updateCvData(rhoE, REPLACE_DATA);
+
+    // -------------------------------------------------------------------------
+    // Initialize scalars from given initial profiles
+    // -------------------------------------------------------------------------
+    for (int iScal = 0; iScal < nScal; iScal++)
+    {
+      char *scalname = scalarTranspEqVector[iScal].getName();
+      double *phi = scalarTranspEqVector[iScal].phi;
+
+      if (!checkScalarFlag(scalname))
+        for (int icv = 0; icv < ncv; icv++)
+        {
+          int pos = 1;
+          // while pos and pos-1 dont sandwich x_cv, keep increasing pos
+          while(profilesIC[pos][0] < x_cv[icv][1] && (pos < nnIC-1))       pos++;
+
+          double fi;
+          // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
+          if      (x_cv[icv][1] > profilesIC[pos][0])    fi = 1.0;
+          // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
+          else if (x_cv[icv][1] < profilesIC[pos-1][0])  fi = 0.0;
+          else    fi = (x_cv[icv][1] - profilesIC[pos-1][0])/(profilesIC[pos][0] - profilesIC[pos-1][0]);
+
+          double phi1 = profilesIC[pos-1][5+iScal];
+          double phi2 = profilesIC[pos][5+iScal];
+          phi[icv] = phi1 + fi*(phi2 - phi1);
+        }
+
+      updateCvData(phi, REPLACE_DATA);
+    }
+
+    for (int i = 0; i < nnIC; i++)
+      delete [] profilesIC[i];
+    delete [] profilesIC;
+  }
+  else
+  {
+    // -------------------------------------------------------------------------
+    // Initialize mean flow with uniform values
+    // -------------------------------------------------------------------------
+    double rho_init, p_init, u_init[3] = {0.0, 0.0, 0.0};
+
+    Param *p;
+    if (getParam(p, "RHO_INITIAL"))       rho_init = p->getDouble(1);
+    else                                  rho_init = rho_ref;
+
+    if (getParam(p, "P_INITIAL"))         p_init = p->getDouble(1);
+    else                                  p_init = p_ref;
+
+    if (getParam(p, "U_INITIAL"))
+    {
+      u_init[0] = p->getDouble(1);
+      u_init[1] = p->getDouble(2);
+      u_init[2] = p->getDouble(3);
+    }
+
+    if (!checkDataFlag(rho))
+      for (int icv=0; icv<ncv; icv++)
+        rho[icv] = rho_init;
+
+    if (!checkDataFlag(rhou))
+      for (int icv=0; icv<ncv; icv++)
+        for (int i=0; i<3; i++)
+          rhou[icv][i] = rho_init*u_init[i];
+
+    if (!checkDataFlag(rhoE))
+      for (int icv=0; icv<ncv; icv++)
+        rhoE[icv] = p_init/(gamma[icv]-1.0)+ 0.5*rho_init*vecDotVec3d(u_init, u_init);
+
+    updateCvData(rhou, REPLACE_ROTATE_DATA);
+    updateCvData(rho,  REPLACE_DATA);
+    updateCvData(rhoE, REPLACE_DATA);
+
+    // -------------------------------------------------------------------------
+    // Initialize scalars with uniform profiles
+    // -------------------------------------------------------------------------
+    double *turb = new double[nScal];
+    Param *pmy;
+    if (getParam(pmy, "INITIAL_CONDITION_TURB"))
+    {
+      for (int i = 0; i < nScal; i++)
+        turb[i] = pmy->getDouble(i+1);
+    }
+    else
+    {
+      cerr << " Could not find the parameter INITIAL_CONDITION_TURB to set the initial field "<< endl;
+      throw(-1);
+    }
+
+    for (int iScal = 0; iScal < nScal; iScal++)
+    {
+      char *scalname = scalarTranspEqVector[iScal].getName();
+      double *phi = scalarTranspEqVector[iScal].phi;
+
+      if (!checkScalarFlag(scalname))
+        for (int icv=0; icv<ncv; icv++)
+          phi[icv] = turb[iScal];
+    }
+    delete [] turb;
+  }
+
+  // ============================================================================
+  // SET THE BOUNDARY PROFILES
+  // ============================================================================
+  string fileBC = "none";
+  for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+    if (zone->getKind() == FA_ZONE_BOUNDARY)
+    {
+      Param *param;
+      if (getParam(param, zone->getName()))
+        if (param->getString() == "PROFILES")
+          fileBC = param->getString(2);
+    }
+
+  // -------------------------------------------------------------------------
+  // Store the boundary profiles
+  // -------------------------------------------------------------------------
+  if ( fileBC != "none")
+  {
+    FILE *fp;
+    if ((fp = fopen(fileBC.c_str(), "rt")) == NULL)
+    {
+      cout << "could not open the file "<< fileBC << endl;
+      throw(-1);
+    }
+
+    // read the boundary profiles
+    int nnBC, nval;
+    fscanf(fp,"n=%d\td=%d", &nnBC, &nval);
+    if ((nval-5) != nScal)
+    {
+      cout << "file " << fileBC << "does not have required number of inputs" << endl;
+      throw(-1);
+    }
+
+    double **profilesBC = new double *[nnBC];
+    for (int i = 0; i < nnBC; i++)
+      profilesBC[i] = new double [nval];
+
+    // file has variables y, rho, u, v, press, ...
+    for (int i = 0; i < nnBC; i++)
+      for (int v = 0; v < nval; v++)
+        fscanf(fp, "%lf", &profilesBC[i][v]);
+
+    fclose(fp);
+    if (mpi_rank == 0)
+      cout << "finished reading " << fileBC << endl;
+
+    // -------------------------------------------------------------------------
+    // Interpolate the mean flow boundary profiles
+    // -------------------------------------------------------------------------
+    for (list<FaZone>::iterator zone = faZoneList.begin(); zone != faZoneList.end(); zone++)
+      if (zone->getKind() == FA_ZONE_BOUNDARY)
+      {
+        Param *param;
+        if (getParam(param, zone->getName()))
+          if (param->getString() == "PROFILES")
+          {
+            for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+            {
+              int pos=1;
+              while ((profilesBC[pos][0] < x_fa[ifa][1]) && (pos < nnBC-1))      pos++;
+
+              double f;
+              if      (x_fa[ifa][1] > profilesBC[pos][0])   f = 1.0;
+              else if (x_fa[ifa][1] < profilesBC[pos-1][0]) f = 0.0;
+              else    f = (x_fa[ifa][1]-profilesBC[pos-1][0])/(profilesBC[pos][0]-profilesBC[pos-1][0]);
+
+              double rho1 = profilesBC[pos-1][1];
+              double rho2 = profilesBC[pos][1];
+              rho_bpr[ifa] = rho1 + f*(rho2 - rho1);
+
+              double uvel1 = profilesBC[pos-1][2];
+              double uvel2 = profilesBC[pos][2];
+              vel_bpr[ifa][0] = uvel1 + f*(uvel2 - uvel1);
+
+              double vvel1 = profilesBC[pos-1][3];
+              double vvel2 = profilesBC[pos][3];
+              vel_bpr[ifa][1] = 0.0; //vvel1 + f*(vvel2 - vvel1);
+              vel_bpr[ifa][2] = 0.0;
+
+              double press1 = profilesBC[pos-1][4];
+              double press2 = profilesBC[pos][4];
+              p_bpr[ifa] = press1 + f*(press2-press1);
+            }
+
+            // -------------------------------------------------------------------------
+            // Interpolate the scalar's boundary profiles
+            // -------------------------------------------------------------------------
+            for (int iScal = 0; iScal < nScal; iScal++)
+            {
+              string scalname = scalarTranspEqVector[iScal].getName();
+              double *phi_bpr = scalarTranspEqVector[iScal].phi_bpr;
+
+                for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+                {
+                  int pos = 1;
+                  // while pos and pos-1 dont sandwich x_cv, keep increasing pos
+                  while(profilesBC[pos][0] < x_fa[ifa][1] && (pos < nnBC-1))       pos++;
+
+                  double fi;
+                  // if boundVal doesn't have a node high enough to sandwich x_cv[icv]
+                  if      (x_fa[ifa][1] > profilesBC[pos][0])    fi = 1.0;
+                  // if boundVal doesn't have a node low enough to sandwich x_cv[icv]
+                  else if (x_fa[ifa][1] < profilesBC[pos-1][0])  fi = 0.0;
+                  else    fi = (x_fa[ifa][1] - profilesBC[pos-1][0])/(profilesBC[pos][0] - profilesBC[pos-1][0]);
+
+                  double phi1 = profilesBC[pos-1][5+iScal];
+                  double phi2 = profilesBC[pos][5+iScal];
+                  phi_bpr[ifa] = phi1 + fi*(phi2 - phi1);
+                }
+            }
+          }
+      }
+
+    for (int i = 0; i < nnBC; i++)
+      delete [] profilesBC[i];
+    delete [] profilesBC;
+  }
 }
 
 void JoeWithModels::runForwardEuler()
@@ -614,13 +928,13 @@ void JoeWithModels::runBackwardEuler()
   double incCFL = getParam("CFL_RAMP")->getDouble("FACTOR_CFL");
   double maxCFL = getParam("CFL_RAMP")->getDouble("MAX_CFL");
 
-	string SpaceIntName = getStringParam("SPACE_INTEGRATION","HLLC");
-	if (SpaceIntName == "JST") { 
-		PressSensor = new double[ncv_g]; Conserv_Und_Lapl = new double[ncv_g][5]; Lambda = new double[ncv_g];
-		BoundaryCV = new bool[ncv_g]; NeighborCV = new int[ncv_g];
-		p1_Und_Lapl = new double[ncv_g]; p2_Und_Lapl   = new double[ncv_g]; 
-		calcJSTCoeff_Const(0);
-	}
+  string SpaceIntName = getStringParam("SPACE_INTEGRATION","HLLC");
+  if (SpaceIntName == "JST") {
+    PressSensor = new double[ncv_g]; Conserv_Und_Lapl = new double[ncv_g][5]; Lambda = new double[ncv_g];
+    BoundaryCV = new bool[ncv_g]; NeighborCV = new int[ncv_g];
+    p1_Und_Lapl = new double[ncv_g]; p2_Und_Lapl   = new double[ncv_g];
+    calcJSTCoeff_Const(0);
+  }
 
   // -------------------------------------------------------------------------------------------
   // update state properties: velocity, pressure, temperature, enthalpy, gamma and R
@@ -684,7 +998,6 @@ void JoeWithModels::runBackwardEuler()
         dScal[iScal][icv] = 0.0;
     }
 
-
     // ---------------------------------------------------------------------------------
     // calculate RHS for both NSE and scalars
     // ---------------------------------------------------------------------------------
@@ -704,13 +1017,6 @@ void JoeWithModels::runBackwardEuler()
       rhs[icv][4] = underRelax*RHSrhoE[icv];
 
       residField[icv] = RHSrhou[icv][0];
-      /*if (icv == 7443){
-        if (mpi_rank == 0){
-        cout << "Bad: "<< icv << endl;
-        cout << "residField: " << residField[icv] << endl;
-        cout << "loc: " << x_cv[icv][0] << " " << x_cv[icv][1] << endl;}
-      }*/
-
 
       double tmp = cv_volume[icv]/(local_dt[icv]);
       for (int i = 0; i < 5; i++)
@@ -869,7 +1175,7 @@ void JoeWithModels::runBackwardEuler()
   finalHookScalarRansTurbModel();
   finalHook();
 
-  //writeData(step);
+  writeData(step);
   writeRestart();
 
 
@@ -2725,44 +3031,44 @@ void JoeWithModels::calcEulerFlux(double *rhs_rho, double (*rhs_rhou)[3], double
     // .............................................................................................
     if (flagImplicit)
     {
-			if (SpaceIntName == "HLLC")
-				calcEulerFluxMatrices_HLLC(Apl, Ami, AplScal, AmiScal,
-																	 rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
-																	 rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
-																	 area, nVec, nScal, 0.0);
-			else if (SpaceIntName == "AUSMDV")
-			{
+      if (SpaceIntName == "HLLC")
+        calcEulerFluxMatrices_HLLC(Apl, Ami, AplScal, AmiScal,
+            rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
+            rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
+            area, nVec, nScal, 0.0);
+      else if (SpaceIntName == "AUSMDV")
+      {
         if (ShockFix != "HAENEL")
           calcEulerFluxMatrices_AUSMDV(Apl, Ami, AplScal, AmiScal,
-                                  rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
-                                  rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
-                                  area, nVec, nScal, 0.0, AUSM_Type, ShockFix, Entropy_Fix);
+              rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
+              rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
+              area, nVec, nScal, 0.0, AUSM_Type, ShockFix, Entropy_Fix);
         else
           calcEulerFluxMatrices_HAENEL(Apl, Ami, AplScal, AmiScal,
-                                  rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
-                                  rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
-                                  area, nVec, nScal, 0.0);
-			}
-			else if (SpaceIntName == "ROE")
-				calcEulerFluxMatrices_Roe(Apl, Ami, AplScal, AmiScal,
-																	rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
-																	rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
-																	area, nVec, nScal, 0.0);
-			else if (SpaceIntName == "AUSM")
-				calcEulerFluxMatrices_HLLC(Apl, Ami, AplScal, AmiScal,
-																	rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
-																	rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
-																	area, nVec, nScal, 0.0);
-			else if (SpaceIntName == "HAENEL")
-          calcEulerFluxMatrices_HAENEL(Apl, Ami, AplScal, AmiScal,
-                                  rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
-                                  rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
-                                  area, nVec, nScal, 0.0);
-			else if (SpaceIntName == "JST")
-				calcEulerFluxMatrices_HLLC(Apl, Ami, AplScal, AmiScal,
-									  rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
-									  rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
-									  area, nVec, nScal, 0.0);
+              rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
+              rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
+              area, nVec, nScal, 0.0);
+      }
+      else if (SpaceIntName == "ROE")
+        calcEulerFluxMatrices_Roe(Apl, Ami, AplScal, AmiScal,
+            rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
+            rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
+            area, nVec, nScal, 0.0);
+      else if (SpaceIntName == "AUSM")
+        calcEulerFluxMatrices_HLLC(Apl, Ami, AplScal, AmiScal,
+            rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
+            rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
+            area, nVec, nScal, 0.0);
+      else if (SpaceIntName == "HAENEL")
+        calcEulerFluxMatrices_HAENEL(Apl, Ami, AplScal, AmiScal,
+            rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
+            rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
+            area, nVec, nScal, 0.0);
+      else if (SpaceIntName == "JST")
+        calcEulerFluxMatrices_HLLC(Apl, Ami, AplScal, AmiScal,
+            rho[icv0], vel[icv0], press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0], gamma[icv0], ScalCV0, kineCV0,
+            rho[icv1], vel[icv1], press[icv1], temp[icv1], enthalpy[icv1], RoM[icv1], gamma[icv1], ScalCV1, kineCV1,
+            area, nVec, nScal, 0.0);
 
       for (int i = 0; i < 5; i++)
       for (int j = 0; j < 5; j++)
@@ -3212,40 +3518,40 @@ void JoeWithModels::calcEulerFlux(double *rhs_rho, double (*rhs_rhou)[3], double
 
             if (flagImplicit)
             {
-							if (SpaceIntName == "HLLC")
-								calcEulerFluxMatrices_HLLC(Apl, NULL, AplScal, AmiScal,
-																					 rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
-																					 rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
-																					 area, nVec, nScal, 0.0);
-							//              calcEulerFluxMatrices_HLLC(Apl, NULL, AplScal, AmiScal,
-							//                        rho0,         u0,           p0,         T0,         h0,         R0,           gam0,         Scalar0, kineFA0,
-							//                        rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa], T_bfa[ifa], h_bfa[ifa], RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
-							//                        area, nVec, nScal, 0.0);
-							else if (SpaceIntName == "AUSMDV")
-                calcEulerFluxMatrices_AUSMDV(Apl, NULL, AplScal, AmiScal,
-                                          rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
-                                          rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
-                                          area, nVec, nScal, 0.0, AUSM_Type, "NONE", Entropy_Fix);
-							else if (SpaceIntName == "ROE")
-								calcEulerFluxMatrices_Roe(Apl, NULL, AplScal, AmiScal,
-																					 rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
-																					 rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
-																					 area, nVec, nScal, 0.0);
-							else if (SpaceIntName == "AUSM")
-								calcEulerFluxMatrices_HLLC(Apl, NULL, AplScal, AmiScal,
-																					rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
-																					rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
-																					area, nVec, nScal, 0.0);
-							else if (SpaceIntName == "HAENEL")
-                calcEulerFluxMatrices_HAENEL(Apl, NULL, AplScal, AmiScal,
-                                          rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
-                                          rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
-                                          area, nVec, nScal, 0.0);
-							else if (SpaceIntName == "JST")
+              if (SpaceIntName == "HLLC")
                 calcEulerFluxMatrices_HLLC(Apl, NULL, AplScal, AmiScal,
-                              rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
-                              rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
-                              area, nVec, nScal, 0.0);
+                    rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
+                    rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
+                    area, nVec, nScal, 0.0);
+              //              calcEulerFluxMatrices_HLLC(Apl, NULL, AplScal, AmiScal,
+              //                        rho0,         u0,           p0,         T0,         h0,         R0,           gam0,         Scalar0, kineFA0,
+              //                        rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa], T_bfa[ifa], h_bfa[ifa], RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
+              //                        area, nVec, nScal, 0.0);
+              else if (SpaceIntName == "AUSMDV")
+                calcEulerFluxMatrices_AUSMDV(Apl, NULL, AplScal, AmiScal,
+                    rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
+                    rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
+                    area, nVec, nScal, 0.0, AUSM_Type, "NONE", Entropy_Fix);
+              else if (SpaceIntName == "ROE")
+                calcEulerFluxMatrices_Roe(Apl, NULL, AplScal, AmiScal,
+                    rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
+                    rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
+                    area, nVec, nScal, 0.0);
+              else if (SpaceIntName == "AUSM")
+                calcEulerFluxMatrices_HLLC(Apl, NULL, AplScal, AmiScal,
+                    rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
+                    rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
+                    area, nVec, nScal, 0.0);
+              else if (SpaceIntName == "HAENEL")
+                calcEulerFluxMatrices_HAENEL(Apl, NULL, AplScal, AmiScal,
+                    rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
+                    rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
+                    area, nVec, nScal, 0.0);
+              else if (SpaceIntName == "JST")
+                calcEulerFluxMatrices_HLLC(Apl, NULL, AplScal, AmiScal,
+                    rho[icv0],    vel[icv0],    press[icv0], temp[icv0], enthalpy[icv0], RoM[icv0],    gamma[icv0],  ScalCV0, kineCV0,
+                    rho_bfa[ifa], vel_bfa[ifa], p_bfa[ifa],  T_bfa[ifa], h_bfa[ifa],     RoM_bfa[ifa], gam_bfa[ifa], Scalar1, kineFA1,
+                    area, nVec, nScal, 0.0);
 
               int noc00 = nbocv_i[icv0]; // icv0's diagonal
               for (int i = 0; i < 5; i++)
@@ -3388,24 +3694,6 @@ void JoeWithModels::calcViscousFluxNS(double *rhs_rho, double (*rhs_rhou)[3], do
         }
       }
     }
-
-    /*if (mpi_rank == 1)
-      if (ifa == 42876){
-        cout << "Res: " << Frhou[0];
-        cout << "fa_normal: " << fa_normal[ifa][0] << ", " << fa_normal[ifa][1] << ", " << fa_normal[ifa][2] << endl;
-        cout << "mut_fa: " << mut_fa[ifa] << endl;
-        cout << "mul_fa: " << mul_fa[ifa] << endl;
-        cout << "kine_fa: " << kine_fa << endl;
-      }
-
-    if (mpi_rank == 1)
-      if (ifa == 45778){
-        cout << "Res: " << Frhou[0];
-        cout << "fa_normal: " << fa_normal[ifa][0] << ", " << fa_normal[ifa][1] << ", " << fa_normal[ifa][2] << endl;
-        cout << "mut_fa: " << mut_fa[ifa] << endl;
-        cout << "mul_fa: " << mul_fa[ifa] << endl;
-        cout << "kine_fa: " << kine_fa << endl;
-      }*/
 
     // icv0 is always valid...
     for (int i = 0; i < 3; i++)
@@ -3891,7 +4179,92 @@ void JoeWithModels::setBC()
               vel_bfa[ifa][i] = velf[i];
             p_bfa[ifa] = rho_bfa[ifa]*cf*cf/gamma[icv0];
             T_bfa[ifa] = p_bfa[ifa]/(R_gas*rho_bfa[ifa]);
+          }
 
+          setScalarBC(&(*zone));
+          ComputeBCProperties_T(&(*zone));
+        }
+        // .............................................................................................
+        // PROFILES BOUNDARY CONDITION
+        // .............................................................................................
+        else if (param->getString() == "PROFILES")
+        {
+          double u_bc[3], T_bc, p_bc, rho_bc, gamma_bc, c_bc, s_bc;
+          gamma_bc = 1.4;
+          double gm1 = gamma_bc - 1.0;
+          double ovgm1 = 1.0/gm1;
+
+          if ((first) && (mpi_rank == 0))
+            cout << "Applying PROFILES            to zone: "<< zone->getName() << endl;
+
+          for (int ifa = zone->ifa_f; ifa <= zone->ifa_l; ifa++)
+          {
+            rho_bc    = rho_bpr[ifa];
+            u_bc[0] = vel_bpr[ifa][0];
+            u_bc[1] = vel_bpr[ifa][1];
+            u_bc[2] = vel_bpr[ifa][2];
+            p_bc      = p_bpr[ifa];
+            T_bc      = p_bc/(rho_bc*R_gas);
+
+            c_bc = sqrt(gamma_bc*p_bc/rho_bc);
+            s_bc = pow(rho_bc,gamma_bc)/p_bc;
+
+            int icv0 = cvofa[ifa][0];
+            assert( icv0 >= 0 );
+
+            double nVec[3];
+            double area = normVec3d(nVec, fa_normal[ifa]);
+
+            //Compute normal velocity of freestream
+            double qn_bc = vecDotVec3d(nVec,u_bc);
+
+            //Subtract from normal velocity of mesh
+            double vn_bc = qn_bc;// - normalvel_bfa[ifa];
+
+            //Compute normal velocity of internal cell
+            double qne = vecDotVec3d(nVec,vel[icv0]);
+
+            //Compute speed of sound in internal cell
+            double ce = sqrt(gamma[icv0]*press[icv0]/rho[icv0]);
+
+            double ac1, ac2;
+
+            //Compute the Riemann invariants in the halo cell
+            if (vn_bc > -c_bc)           // Outflow or subsonic inflow.
+              ac1 = qne   + 2.0*ovgm1*ce;
+            else                     // Supersonic inflow.
+              ac1 = qn_bc + 2.0*ovgm1*c_bc;
+
+            if(vn_bc > c_bc)             // Supersonic outflow.
+              ac2 = qne   - 2.0*ovgm1*ce;
+            else                     // Inflow or subsonic outflow.
+              ac2 = qn_bc - 2.0*ovgm1*c_bc;
+
+
+            double qnf = 0.5*(ac1 + ac2);
+            double cf  = 0.25*(ac1 - ac2)*gm1;
+
+            double velf[3], sf;
+
+            if (vn_bc > 0)                                                       // Outflow
+            {
+              for (int i=0; i<3; i++)
+                velf[i] = vel[icv0][i] + (qnf - qne)*nVec[i];
+              sf = pow( rho[icv0], gamma[icv0])/press[icv0];
+            }
+            else                                                                 // Inflow
+            {
+              for (int i=0; i<3; i++)
+                velf[i] = u_bc[i] + (qnf - qn_bc)*nVec[i];
+              sf = s_bc;
+            }
+
+            //Compute density, pressure and velocity at boundary face
+            rho_bfa[ifa] = pow( (sf*cf*cf/gamma[icv0]), ovgm1);
+            for (int i=0; i<3; i++)
+              vel_bfa[ifa][i] = velf[i];
+            p_bfa[ifa] = rho_bfa[ifa]*cf*cf/gamma[icv0];
+            T_bfa[ifa] = p_bfa[ifa]/(R_gas*rho_bfa[ifa]);
           }
 
           setScalarBC(&(*zone));
@@ -5052,7 +5425,9 @@ void JoeWithModels::calcFluxCoupled(double **rhs, double ***A, int nScal, int fl
           {
             double dummy;
             string scalName(scalarTranspEqVector[iScal].getName());
-            if (!(scalarZoneIsHook(zone->getName(), scalName) || scalarZoneIsDirichlet(dummy, zone->getName(), scalName)))
+            if (!(scalarZoneIsHook(zone->getName(), scalName) ||
+                  scalarZoneIsProfiles(zone->getName(), scalName) ||
+                  scalarZoneIsDirichlet(dummy, zone->getName(), scalName)))
               DiffTerm[iScal] = 0.0;
           }
 
@@ -5241,7 +5616,9 @@ void JoeWithModels::calcFluxCoupled(double **rhs, double ***A, int nScal, int fl
           {
             double dummy;
             string scalname(scalarTranspEqVector[iScal].getName());
-            if (!(scalarZoneIsHook(zone->getName(), scalname) || scalarZoneIsDirichlet(dummy, zone->getName(), scalname)))
+            if (!(scalarZoneIsHook(zone->getName(), scalname) ||
+                  scalarZoneIsProfiles(zone->getName(), scalname) ||
+                  scalarZoneIsDirichlet(dummy, zone->getName(), scalname)))
               DiffTerm[iScal] = 0.0;
           }
 

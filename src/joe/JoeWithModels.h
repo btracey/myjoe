@@ -94,85 +94,62 @@ public:
     return (done);
   }
 
-
-
   /**
    * hook for initializing Navier-Stokes equations
    */
-  virtual void initialHook()
-  {
-    if (mpi_rank == 0)
-      cout << "setInitialCondition()"<< endl;
-
-    double rho_init, p_init, u_init[3] = {0.0, 0.0, 0.0};
-
-    Param *p;
-    if (getParam(p, "RHO_INITIAL"))       rho_init = p->getDouble(1);
-    else                                  rho_init = rho_ref;
-
-    if (getParam(p, "P_INITIAL"))         p_init = p->getDouble(1);
-    else                                  p_init = p_ref;
-
-    if (getParam(p, "U_INITIAL")) 
-    {
-      u_init[0] = p->getDouble(1);
-      u_init[1] = p->getDouble(2);
-      u_init[2] = p->getDouble(3);
-    }
-
-    if (!checkDataFlag(rho))
-      for (int icv=0; icv<ncv; icv++)
-        rho[icv] = rho_init;
-
-    if (!checkDataFlag(rhou))
-      for (int icv=0; icv<ncv; icv++)
-        for (int i=0; i<3; i++)
-          rhou[icv][i] = rho_init*u_init[i];
-
-    if (!checkDataFlag(gamma)) {
-      double gamma_init = GAMMA ;
-      for (int icv=0; icv<ncv; icv++)
-        gamma[icv] = gamma_init ;
-    }
-
-    if (!checkDataFlag(rhoE))
-      for (int icv=0; icv<ncv; icv++)
-        rhoE[icv] = p_init/(gamma[icv]-1.0)+ 0.5*rho_init*vecDotVec3d(u_init, u_init);
-
-
-    // update all data
-    updateCvData(rhou, REPLACE_ROTATE_DATA);
-    updateCvData(rho,  REPLACE_DATA);
-    updateCvData(rhoE, REPLACE_DATA);
-
-//    writeData(0);
-  }
-
+  virtual void initialHook();
 
   /**
    * boundary HOOK
    */
   virtual void boundaryHook(double *rho, double (*vel)[3], double *press, FaZone *zone)  { /*empty*/ }
 
-
   /**
    * source HOOK, rhs already contains fluxes, don't overwrite !!!!!
    * e.g.: gravity
-   *
-   *  for (int icv = 0; icv < ncv; icv++)
-   *  {
-   *    for (int i = 0; i < 3; i++)
-   *    rhs_rhou[icv][i] += cv_volume[icv]*rho[icv]*gravity[i];
-   *    rhs_rhoE[icv] += cv_volume[icv]*(gravity[0]*rhou[icv][0]+gravity[1]*rhou[icv][1]+gravity[2]*rhou[icv][2]);
-   *  }
    */
-  virtual void sourceHook(double *rhs_rho, double (*rhs_rhou)[3], double *rhs_rhoE, double (*A)[5][5])  { /*empty*/ }
+  virtual void sourceHook(double *rhs_rho, double (*rhs_rhou)[3], double *rhs_rhoE, double (*A)[5][5])
+  {
+    for (int icv = 0; icv < ncv; icv++)
+    {
+      rhs_rhou[icv][0] += cv_volume[icv]*rho[icv]*gravity[0];
+      rhs_rhou[icv][1] += cv_volume[icv]*rho[icv]*gravity[1];
+      rhs_rhou[icv][2] += cv_volume[icv]*rho[icv]*gravity[2];
+      rhs_rhoE[icv] += cv_volume[icv]*(gravity[0]*rhou[icv][0]+gravity[1]*rhou[icv][1]+gravity[2]*rhou[icv][2]);
+
+      if (A != NULL){
+        A[nbocv_i[icv]][1][0] -= cv_volume[icv]*gravity[0];
+        A[nbocv_i[icv]][2][0] -= cv_volume[icv]*gravity[1];
+        A[nbocv_i[icv]][3][0] -= cv_volume[icv]*gravity[2];
+        A[nbocv_i[icv]][4][1] -= cv_volume[icv]*gravity[0];
+        A[nbocv_i[icv]][4][2] -= cv_volume[icv]*gravity[1];
+        A[nbocv_i[icv]][4][3] -= cv_volume[icv]*gravity[2];
+      }
+    }
+  }
 
   /**
    * source HOOK, rhs already contains fluxes, don't overwrite !!!!!
    */
-  virtual void sourceHookCoupled(double **rhs, double ***A, int nScal, int flagImplicit)  { /*empty*/ }
+  virtual void sourceHookCoupled(double **rhs, double ***A, int nScal, int flagImplicit) 
+  {
+    for (int icv = 0; icv < ncv; icv++)
+    {
+      rhs[icv][1] += cv_volume[icv]*rho[icv]*gravity[0];
+      rhs[icv][2] += cv_volume[icv]*rho[icv]*gravity[1];
+      rhs[icv][3] += cv_volume[icv]*rho[icv]*gravity[2];
+      rhs[icv][4] += cv_volume[icv]*(gravity[0]*rhou[icv][0]+gravity[1]*rhou[icv][1]+gravity[2]*rhou[icv][2]);
 
+      if (A != NULL){
+        A[nbocv_i[icv]][1][0] -= cv_volume[icv]*gravity[0];
+        A[nbocv_i[icv]][2][0] -= cv_volume[icv]*gravity[1];
+        A[nbocv_i[icv]][3][0] -= cv_volume[icv]*gravity[2];
+        A[nbocv_i[icv]][4][1] -= cv_volume[icv]*gravity[0];
+        A[nbocv_i[icv]][4][2] -= cv_volume[icv]*gravity[1];
+        A[nbocv_i[icv]][4][3] -= cv_volume[icv]*gravity[2];
+      }
+    }
+  }
 
   /**
    * minimum stuff to run a compressible Navier-Stokes simulation
